@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Transcode &amp; Replace</title>
+</head>
+<body>
+<div id="TranscodeReplaceConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
+     data-controller="__plugin/transcodereplace">
+    <div data-role="content">
+        <div class="content-primary">
+
+            <style>
+                #TranscodeReplaceConfigPage .trStatus { margin: 1.5em 0; padding: 1em; border-radius: 6px; background: rgba(0,0,0,0.25); }
+                #TranscodeReplaceConfigPage .trStatus h3 { margin-top: 0; }
+                #TranscodeReplaceConfigPage .trGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75em; }
+                #TranscodeReplaceConfigPage .trStat { font-size: 1.4em; font-weight: 600; }
+                #TranscodeReplaceConfigPage .trDryRun { color: #f0ad4e; font-weight: 600; }
+            </style>
+
+            <form class="trConfigForm">
+                <h2>Transcode &amp; Replace</h2>
+
+                <div class="trStatus" id="trStatusPanel">
+                    <h3>Status</h3>
+                    <div class="trGrid">
+                        <div><div class="trStat" id="trQueueLen">–</div><div>Queue</div></div>
+                        <div><div class="trStat" id="trRunning">–</div><div>Running</div></div>
+                        <div><div class="trStat" id="trDone">–</div><div>Done</div></div>
+                        <div><div class="trStat" id="trFailed">–</div><div>Failed</div></div>
+                        <div><div class="trStat" id="trSavedGb">–</div><div>Saved (GB)</div></div>
+                    </div>
+                    <div id="trEncoders" style="margin-top:1em;"></div>
+                </div>
+
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="DryRun" />
+                        <span class="trDryRun">Dry-run (simulate only, never writes)</span>
+                    </label>
+                    <div class="fieldDescription">First run should stay on. Produces a report of what would be done.</div>
+                </div>
+
+                <div class="selectContainer">
+                    <label class="selectLabel" for="TargetVideoCodec">Target video codec</label>
+                    <select is="emby-select" id="TargetVideoCodec" class="emby-select-withcolor emby-select">
+                        <option value="H264">H.264</option>
+                        <option value="Hevc">HEVC</option>
+                        <option value="Av1">AV1</option>
+                    </select>
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="QualityValue">Quality (CRF / CQ)</label>
+                    <input is="emby-input" type="number" id="QualityValue" min="0" max="51" />
+                    <div class="fieldDescription">Lower = better quality / larger. 23 is a sane HEVC default.</div>
+                </div>
+
+                <div class="selectContainer">
+                    <label class="selectLabel" for="Mode">Quality vs. speed</label>
+                    <select is="emby-select" id="Mode" class="emby-select-withcolor emby-select">
+                        <option value="Quality">Quality (prefer software libx265/AV1)</option>
+                        <option value="Speed">Speed (prefer hardware)</option>
+                    </select>
+                </div>
+
+                <div class="selectContainer">
+                    <label class="selectLabel" for="EncoderPreference">Encoder preference</label>
+                    <select is="emby-select" id="EncoderPreference" class="emby-select-withcolor emby-select">
+                        <option value="Auto">Auto (probe)</option>
+                        <option value="ForceSoftware">Force software</option>
+                        <option value="ForceHardware">Prefer hardware</option>
+                        <option value="Specific">Specific encoder</option>
+                    </select>
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="SpecificEncoder">Specific encoder name</label>
+                    <input is="emby-input" type="text" id="SpecificEncoder" placeholder="hevc_nvenc" />
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="MaxParallelJobs">Max parallel jobs</label>
+                    <input is="emby-input" type="number" id="MaxParallelJobs" min="1" max="8" />
+                    <div class="fieldDescription">Keep at 1 for GPU encoders (NVENC session limits).</div>
+                </div>
+
+                <div class="selectContainer">
+                    <label class="selectLabel" for="AudioMode">Audio</label>
+                    <select is="emby-select" id="AudioMode" class="emby-select-withcolor emby-select">
+                        <option value="Copy">Copy</option>
+                        <option value="AddAac">Copy + add AAC</option>
+                        <option value="Transcode">Transcode to AAC</option>
+                    </select>
+                </div>
+
+                <div class="selectContainer">
+                    <label class="selectLabel" for="PreferredContainer">Container</label>
+                    <select is="emby-select" id="PreferredContainer" class="emby-select-withcolor emby-select">
+                        <option value="Keep">Keep source</option>
+                        <option value="Mkv">MKV</option>
+                        <option value="Mp4">MP4</option>
+                    </select>
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="MinSourceBitrateKbps">Minimum source bitrate (kbps)</label>
+                    <input is="emby-input" type="number" id="MinSourceBitrateKbps" min="0" />
+                    <div class="fieldDescription">0 = process everything. Higher = only fat files.</div>
+                </div>
+
+                <div class="checkboxContainer">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="SkipIfAlreadyTargetCodec" />
+                        <span>Skip files already in the target codec</span>
+                    </label>
+                </div>
+
+                <div class="selectContainer">
+                    <label class="selectLabel" for="ReplaceMode">Replace policy</label>
+                    <select is="emby-select" id="ReplaceMode" class="emby-select-withcolor emby-select">
+                        <option value="BackupThenDelete">Backup then delete (safe)</option>
+                        <option value="SideBySide">Keep side by side</option>
+                        <option value="HardReplace">Hard replace (no backup)</option>
+                    </select>
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="BackupRetentionDays">Backup retention (days)</label>
+                    <input is="emby-input" type="number" id="BackupRetentionDays" min="0" />
+                </div>
+
+                <div class="checkboxContainer">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="EnableVmafGate" />
+                        <span>Enable VMAF quality gate</span>
+                    </label>
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="VmafThreshold">VMAF threshold</label>
+                    <input is="emby-input" type="number" id="VmafThreshold" min="0" max="100" step="0.5" />
+                </div>
+
+                <div class="checkboxContainer">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="SkipHdr" />
+                        <span>Skip HDR sources</span>
+                    </label>
+                </div>
+
+                <div class="checkboxContainer">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="SkipDolbyVision" />
+                        <span>Skip Dolby Vision sources (recommended)</span>
+                    </label>
+                </div>
+
+                <div class="checkboxContainer">
+                    <label>
+                        <input is="emby-checkbox" type="checkbox" id="RunOnlyWhenIdle" />
+                        <span>Run only when the server is idle</span>
+                    </label>
+                </div>
+
+                <button is="emby-button" type="submit" class="raised button-submit block">
+                    <span>Save</span>
+                </button>
+            </form>
+
+            <script type="text/javascript">
+                (function () {
+                    var pluginId = "eff73e61-0320-4bce-bb2c-27fb68604e9d";
+
+                    function setVal(id, value) {
+                        var el = document.querySelector('#TranscodeReplaceConfigPage #' + id);
+                        if (!el) { return; }
+                        if (el.type === 'checkbox') { el.checked = !!value; }
+                        else { el.value = value == null ? '' : value; }
+                    }
+
+                    function getVal(id) {
+                        var el = document.querySelector('#TranscodeReplaceConfigPage #' + id);
+                        if (!el) { return null; }
+                        if (el.type === 'checkbox') { return el.checked; }
+                        if (el.type === 'number') { return el.value === '' ? 0 : Number(el.value); }
+                        return el.value;
+                    }
+
+                    function setText(id, v) {
+                        var el = document.querySelector('#TranscodeReplaceConfigPage #' + id);
+                        if (el) { el.textContent = (v == null ? '–' : v); }
+                    }
+
+                    function loadStatus() {
+                        ApiClient.fetch({
+                            url: ApiClient.getUrl('TranscodeReplace/Status'),
+                            type: 'GET',
+                            dataType: 'json'
+                        }).then(function (s) {
+                            setText('trQueueLen', s.QueueLength);
+                            setText('trRunning', s.Running);
+                            setText('trDone', s.Done);
+                            setText('trFailed', s.Failed);
+                            setText('trSavedGb', (s.SavedBytes / 1073741824).toFixed(2));
+                            var enc = document.querySelector('#TranscodeReplaceConfigPage #trEncoders');
+                            if (enc) {
+                                enc.textContent = 'Usable encoders: ' +
+                                    ((s.UsableEncoders && s.UsableEncoders.join(', ')) || 'probing...');
+                            }
+                        }).catch(function () { /* status endpoint arrives in a later milestone */ });
+                    }
+
+                    function load() {
+                        Dashboard.showLoadingMsg();
+                        ApiClient.getPluginConfiguration(pluginId).then(function (c) {
+                            setVal('DryRun', c.DryRun);
+                            setVal('TargetVideoCodec', c.TargetVideoCodec);
+                            setVal('QualityValue', c.QualityValue);
+                            setVal('Mode', c.Mode);
+                            setVal('EncoderPreference', c.EncoderPreference);
+                            setVal('SpecificEncoder', c.SpecificEncoder);
+                            setVal('MaxParallelJobs', c.MaxParallelJobs);
+                            setVal('AudioMode', c.AudioMode);
+                            setVal('PreferredContainer', c.PreferredContainer);
+                            setVal('MinSourceBitrateKbps', c.MinSourceBitrateKbps);
+                            setVal('SkipIfAlreadyTargetCodec', c.SkipIfAlreadyTargetCodec);
+                            setVal('ReplaceMode', c.ReplaceMode);
+                            setVal('BackupRetentionDays', c.BackupRetentionDays);
+                            setVal('EnableVmafGate', c.EnableVmafGate);
+                            setVal('VmafThreshold', c.VmafThreshold);
+                            setVal('SkipHdr', c.SkipHdr);
+                            setVal('SkipDolbyVision', c.SkipDolbyVision);
+                            setVal('RunOnlyWhenIdle', c.RunOnlyWhenIdle);
+                            Dashboard.hideLoadingMsg();
+                        });
+                        loadStatus();
+                    }
+
+                    function save(e) {
+                        e.preventDefault();
+                        Dashboard.showLoadingMsg();
+                        ApiClient.getPluginConfiguration(pluginId).then(function (c) {
+                            c.DryRun = getVal('DryRun');
+                            c.TargetVideoCodec = getVal('TargetVideoCodec');
+                            c.QualityValue = getVal('QualityValue');
+                            c.Mode = getVal('Mode');
+                            c.EncoderPreference = getVal('EncoderPreference');
+                            c.SpecificEncoder = getVal('SpecificEncoder');
+                            c.MaxParallelJobs = getVal('MaxParallelJobs');
+                            c.AudioMode = getVal('AudioMode');
+                            c.PreferredContainer = getVal('PreferredContainer');
+                            c.MinSourceBitrateKbps = getVal('MinSourceBitrateKbps');
+                            c.SkipIfAlreadyTargetCodec = getVal('SkipIfAlreadyTargetCodec');
+                            c.ReplaceMode = getVal('ReplaceMode');
+                            c.BackupRetentionDays = getVal('BackupRetentionDays');
+                            c.EnableVmafGate = getVal('EnableVmafGate');
+                            c.VmafThreshold = getVal('VmafThreshold');
+                            c.SkipHdr = getVal('SkipHdr');
+                            c.SkipDolbyVision = getVal('SkipDolbyVision');
+                            c.RunOnlyWhenIdle = getVal('RunOnlyWhenIdle');
+                            ApiClient.updatePluginConfiguration(pluginId, c).then(function (r) {
+                                Dashboard.processPluginConfigurationUpdateResult(r);
+                            });
+                        });
+                        return false;
+                    }
+
+                    var page = document.querySelector('#TranscodeReplaceConfigPage');
+                    page.addEventListener('pageshow', load);
+                    page.querySelector('.trConfigForm').addEventListener('submit', save);
+                })();
+            </script>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Jellyfin.Plugin.TranscodeReplace.Tests/Jellyfin.Plugin.TranscodeReplace.Tests.csproj" />
+  <Project Path="Jellyfin.Plugin.TranscodeReplace/Jellyfin.Plugin.TranscodeReplace.csproj" />
+</Solution>
