@@ -1,19 +1,21 @@
 name: Release
 
-# Fully automated, tag-driven release. You only create an annotated tag whose
-# message is the changelog and push it; everything else happens here:
+# Fully automated release, triggered by editing the RELEASE file on main.
 #
-#   git tag -a v0.0.4 -m "What changed in this release."
-#   git push origin v0.0.4
+# RELEASE format:
+#   line 1     -> version, e.g. 0.0.4 (no leading v)
+#   lines 2..n -> changelog (shown in the GitHub release and the plugin catalog)
 #
-# The workflow then bumps the csproj/build.yaml version, builds, packages the
-# zip, computes the md5, publishes a GitHub release with the zip, and updates
-# manifest.json on main with the real checksum and download URL. Nothing to do
-# by hand. Re-tagging a version overwrites its manifest entry idempotently.
+# Commit a new RELEASE to main and the workflow does the rest: bump the
+# csproj/build.yaml version, build, package the zip, compute the md5, publish a
+# GitHub release with the zip, and update manifest.json on main with the real
+# checksum and download URL. Nothing to do by hand. Re-releasing a version
+# overwrites its manifest entry idempotently.
 
 on:
   push:
-    tags: [ 'v*' ]
+    branches: [ main ]
+    paths: [ 'RELEASE' ]
 
 permissions:
   contents: write
@@ -32,27 +34,27 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resolve version and changelog from the tag
+      - name: Read version and changelog from RELEASE
         id: meta
         run: |
           set -euo pipefail
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::tag must look like v1.2.3 (got '$TAG')"
+          if [ ! -f RELEASE ]; then
+            echo "::error::RELEASE file is missing"
             exit 1
           fi
-          git fetch --tags --force --quiet
+          VERSION="$(head -n 1 RELEASE | tr -d '[:space:]')"
+          VERSION="${VERSION#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::first line of RELEASE must be a version like 1.2.3 (got '$VERSION')"
+            exit 1
+          fi
           CL="${RUNNER_TEMP}/changelog.txt"
-          git for-each-ref "refs/tags/${TAG}" --format='%(contents)' > "$CL"
-          # Drop a signature block if the tag is signed, and fall back to a default
-          # if the tag message is empty (e.g. a lightweight tag).
-          sed -i '/-----BEGIN PGP SIGNATURE-----/,$d' "$CL"
+          tail -n +2 RELEASE | sed '/^[[:space:]]*$/d' > "$CL"
           if ! grep -q '[^[:space:]]' "$CL"; then
-            printf 'Release %s\n' "$TAG" > "$CL"
+            printf 'Release v%s\n' "$VERSION" > "$CL"
           fi
           {
-            echo "tag=$TAG"
+            echo "tag=v$VERSION"
             echo "version=$VERSION"
             echo "version4=${VERSION}.0"
             echo "changelog_file=$CL"
@@ -124,7 +126,7 @@ jobs:
           URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.meta.outputs.tag }}/${ZIP}"
           CHANGELOG="$(cat "${{ steps.meta.outputs.changelog_file }}")"
 
-          # Drop any existing entry for this version (so re-tagging is idempotent),
+          # Drop any existing entry for this version (so re-releasing is idempotent),
           # then prepend the new one to the top of the versions list.
           jq \
             --arg v "$V4" --arg cl "$CHANGELOG" --arg abi "$ABI" \
@@ -139,7 +141,9 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          # Stage only the generated changes; RELEASE is intentionally left untouched
+          # so this push does not re-trigger the workflow.
+          git add manifest.json Jellyfin.Plugin.TranscodeReplace/Jellyfin.Plugin.TranscodeReplace.csproj Jellyfin.Plugin.TranscodeReplace/build.yaml
           if git diff --cached --quiet; then
             echo "No manifest/version changes to commit."
           else
@@ -152,6 +156,7 @@ jobs:
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.tag }}
+          target_commitish: main
           body_path: ${{ steps.meta.outputs.changelog_file }}
           files: |
             package/*.zip
