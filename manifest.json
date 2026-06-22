@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.0.2.0",
+        "changelog": "Redesigned settings page (grouped cards, Settings/History tabs) and a History view that shows each processed file with its poster, codec change and size saving.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Kuschel-code/jellyfin-transcode-replace/releases/download/v0.0.2/transcode-replace_0.0.2.zip",
+        "checksum": "7abc61fbb719e8d5f409f4c1a9bed7f6",
+        "timestamp": "2026-06-22T10:56:47Z"
+      },
+      {
         "version": "0.0.1.0",
         "changelog": "First release. Full pipeline: hardware probe, persistent queue, discovery task, ffprobe verification gates, optional VMAF gate, HDR/Dolby Vision handling, playback/idle/disk guards and atomic replace with backup and permission preservation.",
         "targetAbi": "10.11.0.0",
