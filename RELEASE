@@ -1,0 +1,2 @@
+0.0.4
+Adds VP9 (libvpx-vp9, vp9_qsv, vp9_vaapi), Opus audio (transcode or add a compatibility track) and a WebM container option. Fixes the configuration page so settings load and save again, shows the detected encoders and a live processing/dry-run status, and adds the plugin to the dashboard sidebar.
