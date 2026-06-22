@@ -4,8 +4,7 @@
     <title>Transcode &amp; Replace</title>
 </head>
 <body>
-<div id="TranscodeReplaceConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
-     data-controller="__plugin/transcodereplace">
+<div id="TranscodeReplaceConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
     <div data-role="content">
         <div class="content-primary">
 
@@ -26,6 +25,13 @@
                 #TranscodeReplaceConfigPage .trStatLbl { opacity: .6; font-size: .82em; text-transform: uppercase; letter-spacing: .04em; }
                 #TranscodeReplaceConfigPage .trEnc { margin-top: .9em; opacity: .75; font-size: .9em; }
                 #TranscodeReplaceConfigPage .trDry { color: #f0ad4e; font-weight: 600; }
+                #TranscodeReplaceConfigPage .trActive { margin-top: .9em; font-size: .92em; }
+                #TranscodeReplaceConfigPage .trActiveOn { color: #66bb6a; font-weight: 600; }
+                #TranscodeReplaceConfigPage .trActiveIdle { opacity: .55; }
+                #TranscodeReplaceConfigPage .trDot { display: inline-block; width: .6em; height: .6em; border-radius: 50%;
+                    background: #66bb6a; margin-right: .5em; vertical-align: middle; animation: trPulse 1.2s ease-in-out infinite; }
+                #TranscodeReplaceConfigPage .trDryBanner { color: #f0ad4e; font-weight: 600; margin-top: .6em; }
+                @keyframes trPulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
 
                 #TranscodeReplaceConfigPage .trHistBar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1em; }
                 #TranscodeReplaceConfigPage .trHistTotal { font-size: 1.2em; font-weight: 600; }
@@ -68,7 +74,8 @@
                         <div class="trStat"><div class="trStatNum" id="trFailed">–</div><div class="trStatLbl">Failed</div></div>
                         <div class="trStat"><div class="trStatNum" id="trSavedGb">–</div><div class="trStatLbl">Saved (GB)</div></div>
                     </div>
-                    <div class="trEnc" id="trEncoders"></div>
+                    <div class="trActive" id="trActive"></div>
+                    <div class="trEnc" id="trEncoders">Detecting encoders…</div>
                 </div>
 
                 <form class="trConfigForm">
@@ -106,6 +113,7 @@
                                 <option value="H264">H.264</option>
                                 <option value="Hevc">HEVC</option>
                                 <option value="Av1">AV1</option>
+                                <option value="Vp9">VP9</option>
                             </select>
                         </div>
                         <div class="inputContainer">
@@ -152,6 +160,8 @@
                                 <option value="Copy">Copy</option>
                                 <option value="AddAac">Copy + add AAC</option>
                                 <option value="Transcode">Transcode to AAC</option>
+                                <option value="AddOpus">Copy + add Opus</option>
+                                <option value="TranscodeOpus">Transcode to Opus</option>
                             </select>
                         </div>
                         <div class="selectContainer">
@@ -160,6 +170,7 @@
                                 <option value="Keep">Keep source</option>
                                 <option value="Mkv">MKV</option>
                                 <option value="Mp4">MP4 (falls back to MKV for image subs)</option>
+                                <option value="Webm">WebM (VP9/AV1 + Opus; falls back to MKV for image subs)</option>
                             </select>
                         </div>
                     </div>
@@ -260,16 +271,37 @@
                     }
 
                     function loadStatus() {
-                        ApiClient.fetch({ url: ApiClient.getUrl('TranscodeReplace/Status'), type: 'GET', dataType: 'json' })
+                        return ApiClient.fetch({ url: ApiClient.getUrl('TranscodeReplace/Status'), type: 'GET', dataType: 'json' })
                             .then(function (s) {
                                 setText('trQueueLen', s.QueueLength);
                                 setText('trRunning', s.Running);
                                 setText('trDone', s.Done);
                                 setText('trFailed', s.Failed);
                                 setText('trSavedGb', (s.SavedBytes / 1073741824).toFixed(2));
+
+                                var act = qs('trActive');
+                                if (act) {
+                                    var dry = s.DryRun ? '<div class="trDryBanner">Dry-run is ON — nothing is written. Turn it off below to actually replace files.</div>' : '';
+                                    if (s.Active && s.Active.length) {
+                                        act.innerHTML = '<span class="trActiveOn"><span class="trDot"></span>Processing now: ' +
+                                            s.Active.map(esc).join(', ') + '</span>' + dry;
+                                    } else if (s.QueueLength > 0) {
+                                        act.innerHTML = '<span class="trActiveIdle">Idle — ' + s.QueueLength + ' job(s) queued, waiting to start.</span>' + dry;
+                                    } else {
+                                        act.innerHTML = '<span class="trActiveIdle">Idle — nothing in the queue. Run the "Transcode &amp; Replace: Discover media" task to find files.</span>' + dry;
+                                    }
+                                }
+
                                 var enc = qs('trEncoders');
-                                if (enc) { enc.textContent = 'Usable encoders: ' + ((s.UsableEncoders && s.UsableEncoders.join(', ')) || 'none detected yet'); }
-                            }).catch(function () {});
+                                if (enc) {
+                                    enc.textContent = (s.UsableEncoders && s.UsableEncoders.length)
+                                        ? 'Detected encoders: ' + s.UsableEncoders.join(', ')
+                                        : 'No usable encoders detected yet (this is probed on first use).';
+                                }
+                            }).catch(function () {
+                                var enc = qs('trEncoders');
+                                if (enc) { enc.textContent = 'Could not load status (are you signed in as an administrator?).'; }
+                            });
                     }
 
                     function badgeColor(state) {
@@ -349,14 +381,34 @@
                         }
                     }
 
+                    var statusTimer = null;
+
+                    function startTimers() {
+                        if (!statusTimer) { statusTimer = setInterval(loadStatus, 4000); }
+                    }
+                    function stopTimers() {
+                        if (histTimer) { clearInterval(histTimer); histTimer = null; }
+                        if (statusTimer) { clearInterval(statusTimer); statusTimer = null; }
+                    }
+                    function activate() {
+                        loadConfig();
+                        loadStatus();
+                        startTimers();
+                    }
+
                     page.querySelectorAll('.trTab').forEach(function (b) {
                         b.addEventListener('click', function () { showTab(b.getAttribute('data-tab')); });
                     });
                     qs('trHistRefresh').addEventListener('click', loadHistory);
                     page.querySelector('.trConfigForm').addEventListener('submit', saveConfig);
 
-                    page.addEventListener('pageshow', function () { loadConfig(); loadStatus(); });
-                    page.addEventListener('pagehide', function () { if (histTimer) { clearInterval(histTimer); histTimer = null; } });
+                    // Jellyfin 10.11 dispatches viewshow/viewhide on the page element (not the
+                    // legacy pageshow/pagehide). Bind both, and also run once immediately in case
+                    // the view was already shown before this inline script attached its listeners.
+                    page.addEventListener('viewshow', activate);
+                    page.addEventListener('viewhide', stopTimers);
+                    page.addEventListener('viewdestroy', stopTimers);
+                    activate();
                 })();
             </script>
         </div>

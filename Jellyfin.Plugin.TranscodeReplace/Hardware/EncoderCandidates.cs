@@ -28,11 +28,13 @@ public static class EncoderCandidates
         new("h264_qsv", HwKind.Qsv, TargetVideoCodec.H264, string.Empty),
         new("hevc_qsv", HwKind.Qsv, TargetVideoCodec.Hevc, string.Empty),
         new("av1_qsv", HwKind.Qsv, TargetVideoCodec.Av1, string.Empty),
+        new("vp9_qsv", HwKind.Qsv, TargetVideoCodec.Vp9, string.Empty),
 
         // VA-API (Linux) - needs a render device plus an upload filter even to probe.
         new("h264_vaapi", HwKind.Vaapi, TargetVideoCodec.H264, "-vaapi_device /dev/dri/renderD128 -vf format=nv12,hwupload"),
         new("hevc_vaapi", HwKind.Vaapi, TargetVideoCodec.Hevc, "-vaapi_device /dev/dri/renderD128 -vf format=nv12,hwupload"),
         new("av1_vaapi", HwKind.Vaapi, TargetVideoCodec.Av1, "-vaapi_device /dev/dri/renderD128 -vf format=nv12,hwupload"),
+        new("vp9_vaapi", HwKind.Vaapi, TargetVideoCodec.Vp9, "-vaapi_device /dev/dri/renderD128 -vf format=nv12,hwupload"),
 
         // AMD AMF (Windows)
         new("h264_amf", HwKind.Amf, TargetVideoCodec.H264, string.Empty),
@@ -47,5 +49,6 @@ public static class EncoderCandidates
         new("libx264", HwKind.Software, TargetVideoCodec.H264, string.Empty),
         new("libx265", HwKind.Software, TargetVideoCodec.Hevc, string.Empty),
         new("libsvtav1", HwKind.Software, TargetVideoCodec.Av1, string.Empty),
+        new("libvpx-vp9", HwKind.Software, TargetVideoCodec.Vp9, string.Empty),
     };
 }

@@ -122,22 +122,19 @@ public sealed class ArgBuilder
         switch (mode)
         {
             case AudioHandling.Transcode:
-                args.Add("-c:a");
-                args.Add("aac");
-                args.Add("-b:a");
-                args.Add("256k");
+                Transcode("aac", "256k");
+                break;
+
+            case AudioHandling.TranscodeOpus:
+                Transcode("libopus", "192k");
                 break;
 
             case AudioHandling.AddAac:
-                // Keep all originals, append a single AAC compatibility track.
-                args.Add("-c:a");
-                args.Add("copy");
-                args.Add("-map");
-                args.Add("0:a:0?");
-                args.Add(string.Format(CultureInfo.InvariantCulture, "-c:a:{0}", audioStreamCount));
-                args.Add("aac");
-                args.Add(string.Format(CultureInfo.InvariantCulture, "-b:a:{0}", audioStreamCount));
-                args.Add("256k");
+                AddCompatibilityTrack("aac", "256k");
+                break;
+
+            case AudioHandling.AddOpus:
+                AddCompatibilityTrack("libopus", "192k");
                 break;
 
             case AudioHandling.Copy:
@@ -146,11 +143,37 @@ public sealed class ArgBuilder
                 args.Add("copy");
                 break;
         }
+
+        void Transcode(string codec, string bitrate)
+        {
+            args.Add("-c:a");
+            args.Add(codec);
+            args.Add("-b:a");
+            args.Add(bitrate);
+        }
+
+        // Keep all originals, append a single compatibility track in the given codec.
+        void AddCompatibilityTrack(string codec, string bitrate)
+        {
+            args.Add("-c:a");
+            args.Add("copy");
+            args.Add("-map");
+            args.Add("0:a:0?");
+            args.Add(string.Format(CultureInfo.InvariantCulture, "-c:a:{0}", audioStreamCount));
+            args.Add(codec);
+            args.Add(string.Format(CultureInfo.InvariantCulture, "-b:a:{0}", audioStreamCount));
+            args.Add(bitrate);
+        }
     }
 
     private static void AppendSubtitles(List<string> args, string ext)
     {
         args.Add("-c:s");
-        args.Add(ext == "mp4" ? "mov_text" : "copy");
+        args.Add(ext switch
+        {
+            "mp4" => "mov_text",
+            "webm" => "webvtt",
+            _ => "copy"
+        });
     }
 }

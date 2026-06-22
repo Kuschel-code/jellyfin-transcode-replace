@@ -47,6 +47,9 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         new PluginPageInfo
         {
             Name = "transcodereplace",
+            DisplayName = "Transcode & Replace",
+            EnableInMainMenu = true,
+            MenuIcon = "theaters",
             EmbeddedResourcePath = string.Format(
                 CultureInfo.InvariantCulture,
                 "{0}.Configuration.configPage.html",

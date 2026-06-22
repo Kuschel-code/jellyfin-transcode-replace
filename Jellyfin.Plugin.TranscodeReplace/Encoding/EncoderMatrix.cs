@@ -33,6 +33,9 @@ public static class EncoderMatrix
         {
             "libx264" or "libx265" => new[] { "-crf", q, "-preset", softwarePreset },
             "libsvtav1" => new[] { "-crf", q, "-preset", SvtPreset(softwarePreset) },
+            // libvpx-vp9 constant-quality mode needs -b:v 0 alongside -crf; row-mt
+            // enables tile threading and cpu-used trades speed for quality.
+            "libvpx-vp9" => new[] { "-crf", q, "-b:v", "0", "-deadline", "good", "-cpu-used", Vp9CpuUsed(softwarePreset), "-row-mt", "1" },
             _ => encoder.Kind switch
             {
                 HwKind.Nvenc => new[] { "-preset", "p5", "-cq", q },
@@ -57,5 +60,18 @@ public static class EncoderMatrix
         "faster" => "9",
         "veryfast" => "10",
         _ => "6"
+    };
+
+    // libvpx-vp9 cpu-used: 0 is slowest/best, higher is faster (0-5 in good mode).
+    private static string Vp9CpuUsed(string softwarePreset) => softwarePreset switch
+    {
+        "veryslow" => "0",
+        "slower" => "1",
+        "slow" => "1",
+        "medium" => "2",
+        "fast" => "3",
+        "faster" => "4",
+        "veryfast" => "5",
+        _ => "2"
     };
 }
