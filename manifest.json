@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.0.5.0",
+        "changelog": "Restores the config page's pageshow handler so settings reliably load and save again (the dangling data-controller was the root cause; pageshow is the event the official Jellyfin template uses). Includes the 0.0.4 features: VP9 (libvpx-vp9, vp9_qsv, vp9_vaapi), Opus audio, a WebM container option, the detected-encoder list, a live processing/dry-run status and the dashboard sidebar entry.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Kuschel-code/jellyfin-transcode-replace/releases/download/v0.0.5/transcode-replace_0.0.5.zip",
+        "checksum": "dc18e3eeda76092e2ae22d53add81f66",
+        "timestamp": "2026-06-22T23:01:42Z"
+      },
+      {
         "version": "0.0.4.0",
         "changelog": "Adds VP9 (libvpx-vp9, vp9_qsv, vp9_vaapi), Opus audio (transcode or add a compatibility track) and a WebM container option. Fixes the configuration page so settings load and save again, shows the detected encoders and a live processing/dry-run status, and adds the plugin to the dashboard sidebar.",
         "targetAbi": "10.11.0.0",
