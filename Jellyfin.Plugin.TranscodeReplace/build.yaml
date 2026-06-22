@@ -1,7 +1,7 @@
 ---
 name: "Transcode & Replace"
 guid: "eff73e61-0320-4bce-bb2c-27fb68604e9d"
-version: "0.0.2.0"
+version: "0.0.3.0"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 owner: "Kuschel-code"
@@ -15,6 +15,7 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.TranscodeReplace.dll"
 changelog: >
-  0.0.2.0 - Redesigned settings page (grouped cards, Settings/History tabs) and a
-  History view that shows each processed file with its poster, codec change and size
-  saving, like a transcode log. 0.0.1.0 - First release with the full pipeline.
+  0.0.3.0 - Crash-safe replace: the original is backed up by hardlink/copy and the new
+  file is swapped in with one atomic rename, so the source is never empty; an interrupted
+  replace is recovered on startup. 0.0.2.0 - Redesigned settings page and a History view
+  with posters, codec change and size saving. 0.0.1.0 - First release.
