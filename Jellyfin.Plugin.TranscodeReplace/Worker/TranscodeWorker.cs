@@ -76,6 +76,8 @@ public sealed class TranscodeWorker : BackgroundService
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        RecoverOrphanedBackups();
+
         var reset = _queue.ResetInFlight();
         if (reset > 0)
         {
@@ -301,6 +303,34 @@ public sealed class TranscodeWorker : BackgroundService
         };
 
         return ordered.FirstOrDefault();
+    }
+
+    private void RecoverOrphanedBackups()
+    {
+        foreach (var job in _queue.Snapshot())
+        {
+            // Only an interrupted replace can leave a legitimately orphaned backup.
+            // That state is persisted before the destructive step; Done jobs whose
+            // source was later deleted by the user must not be touched.
+            if (job.State != JobState.Replacing)
+            {
+                continue;
+            }
+
+            try
+            {
+                if (_replacer.RestoreOrphanedBackup(job.SourcePath))
+                {
+                    _logger.LogWarning(
+                        "Recovered original from backup after an interrupted replace: {Source}",
+                        job.SourcePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Could not restore backup for {Source}", job.SourcePath);
+            }
+        }
     }
 
     private void CleanupStaleTemps()

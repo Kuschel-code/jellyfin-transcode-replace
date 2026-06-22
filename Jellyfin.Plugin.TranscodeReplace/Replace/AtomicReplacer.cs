@@ -22,7 +22,8 @@ public sealed record ReplaceResult(bool Success, string FinalPath, long OutputSi
 /// </summary>
 public sealed class AtomicReplacer
 {
-    private const string BackupSuffix = ".trbak";
+    /// <summary>File extension used for the retained backup of the original.</summary>
+    public const string BackupExtension = ".trbak";
 
     private readonly FilePermissions _permissions;
     private readonly ILogger<AtomicReplacer> _logger;
@@ -77,6 +78,25 @@ public sealed class AtomicReplacer
         }
     }
 
+    /// <summary>
+    /// Crash recovery: if the source path is missing but its backup exists, move the
+    /// backup back to the source path. Keyed on the filesystem state (not job state),
+    /// because the backup path is only persisted after a successful replace.
+    /// </summary>
+    /// <param name="sourcePath">The original source path.</param>
+    /// <returns>True if the original was restored from a backup.</returns>
+    public bool RestoreOrphanedBackup(string sourcePath)
+    {
+        var backup = sourcePath + BackupExtension;
+        if (File.Exists(sourcePath) || !File.Exists(backup))
+        {
+            return false;
+        }
+
+        File.Move(backup, sourcePath);
+        return true;
+    }
+
     /// <summary>Deletes a retained backup file. Best effort.</summary>
     /// <param name="backupPath">Backup path.</param>
     /// <returns>True if the backup no longer exists afterwards.</returns>
@@ -123,7 +143,7 @@ public sealed class AtomicReplacer
 
     private ReplaceResult ReplaceWithBackup(string source, string tempPath, long outputSize)
     {
-        var backup = source + BackupSuffix;
+        var backup = source + BackupExtension;
         var perms = _permissions.Snapshot(source);
 
         if (File.Exists(backup))
