@@ -37,6 +37,12 @@ public sealed class TranscodeJob
     /// <summary>Gets or sets the size of the produced output in bytes, if known.</summary>
     public long? OutputSize { get; set; }
 
+    /// <summary>Gets or sets the source video codec (from ffprobe).</summary>
+    public string? SourceCodec { get; set; }
+
+    /// <summary>Gets or sets the output video codec (from ffprobe), if produced.</summary>
+    public string? OutputCodec { get; set; }
+
     /// <summary>Gets or sets the backup path retained until the retention window expires.</summary>
     public string? BackupPath { get; set; }
 

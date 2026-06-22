@@ -155,6 +155,8 @@ public sealed class TranscodeWorker : BackgroundService
             return;
         }
 
+        job.SourceCodec = summary.VideoCodec;
+
         var (skip, skipReason) = JobEligibility.Evaluate(summary, config);
         if (skip)
         {
@@ -205,6 +207,7 @@ public sealed class TranscodeWorker : BackgroundService
         _queue.Update(job);
 
         var outputSummary = await _mediaProbe.ProbeAsync(ffprobePath, build.TempOutputPath, cancellationToken).ConfigureAwait(false);
+        job.OutputCodec = outputSummary?.VideoCodec;
         var outputSize = File.Exists(build.TempOutputPath) ? new FileInfo(build.TempOutputPath).Length : 0;
         var verification = Verifier.Check(summary, outputSummary, sourceSize, outputSize, config);
 

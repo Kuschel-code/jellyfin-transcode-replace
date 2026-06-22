@@ -1,7 +1,7 @@
 ---
 name: "Transcode & Replace"
 guid: "eff73e61-0320-4bce-bb2c-27fb68604e9d"
-version: "0.0.1.0"
+version: "0.0.2.0"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 owner: "Kuschel-code"
@@ -15,7 +15,6 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.TranscodeReplace.dll"
 changelog: >
-  0.0.1.0 - First release. Full pipeline: hardware probe, persistent queue,
-  discovery task, ffmpeg arg builder, ffprobe verification gates, optional VMAF
-  gate, HDR/Dolby Vision handling, playback/idle/disk guards and atomic replace
-  with backup and permission preservation. Targets Jellyfin 10.11.
+  0.0.2.0 - Redesigned settings page (grouped cards, Settings/History tabs) and a
+  History view that shows each processed file with its poster, codec change and size
+  saving, like a transcode log. 0.0.1.0 - First release with the full pipeline.

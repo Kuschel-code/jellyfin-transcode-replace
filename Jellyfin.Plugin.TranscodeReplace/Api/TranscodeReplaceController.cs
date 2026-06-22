@@ -1,8 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Jellyfin.Plugin.TranscodeReplace.Hardware;
 using Jellyfin.Plugin.TranscodeReplace.Queue;
+using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.MediaEncoding;
+using MediaBrowser.Model.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -34,9 +39,55 @@ public sealed class StatusDto
     public string[] UsableEncoders { get; set; } = Array.Empty<string>();
 }
 
+/// <summary>One row of the transcode history shown on the config page.</summary>
+public sealed class JobDto
+{
+    /// <summary>Gets or sets the job id.</summary>
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the Jellyfin item id (for the poster image).</summary>
+    public string ItemId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the display name.</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets a value indicating whether the item has a primary image.</summary>
+    public bool HasPrimaryImage { get; set; }
+
+    /// <summary>Gets or sets the job state.</summary>
+    public string State { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the source path.</summary>
+    public string SourcePath { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the source video codec.</summary>
+    public string? SourceCodec { get; set; }
+
+    /// <summary>Gets or sets the output video codec.</summary>
+    public string? OutputCodec { get; set; }
+
+    /// <summary>Gets or sets the source size in bytes.</summary>
+    public long SourceSize { get; set; }
+
+    /// <summary>Gets or sets the output size in bytes.</summary>
+    public long? OutputSize { get; set; }
+
+    /// <summary>Gets or sets the bytes saved.</summary>
+    public long SavedBytes { get; set; }
+
+    /// <summary>Gets or sets the VMAF score, if measured.</summary>
+    public double? Vmaf { get; set; }
+
+    /// <summary>Gets or sets the error/skip reason, if any.</summary>
+    public string? Error { get; set; }
+
+    /// <summary>Gets or sets the completion time (ISO-8601 UTC).</summary>
+    public string? CompletedUtc { get; set; }
+}
+
 /// <summary>
-/// Read-only status endpoint for the configuration page. Restricted to
-/// administrators because it exposes encoder details and queue counts.
+/// Read-only endpoints for the configuration page (status and history).
+/// Restricted to administrators.
 /// </summary>
 [ApiController]
 [Authorize(Policy = "RequiresElevation")]
@@ -47,6 +98,7 @@ public class TranscodeReplaceController : ControllerBase
     private readonly IJobQueue _queue;
     private readonly HardwareProbe _probe;
     private readonly IMediaEncoder _mediaEncoder;
+    private readonly ILibraryManager _libraryManager;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TranscodeReplaceController"/> class.
@@ -54,11 +106,17 @@ public class TranscodeReplaceController : ControllerBase
     /// <param name="queue">Job queue.</param>
     /// <param name="probe">Hardware probe.</param>
     /// <param name="mediaEncoder">Media encoder.</param>
-    public TranscodeReplaceController(IJobQueue queue, HardwareProbe probe, IMediaEncoder mediaEncoder)
+    /// <param name="libraryManager">Library manager (for item names and images).</param>
+    public TranscodeReplaceController(
+        IJobQueue queue,
+        HardwareProbe probe,
+        IMediaEncoder mediaEncoder,
+        ILibraryManager libraryManager)
     {
         _queue = queue;
         _probe = probe;
         _mediaEncoder = mediaEncoder;
+        _libraryManager = libraryManager;
     }
 
     /// <summary>Gets the current queue and encoder status.</summary>
@@ -82,6 +140,57 @@ public class TranscodeReplaceController : ControllerBase
             SavedBytes = saved,
             UsableEncoders = UsableEncoderNames()
         };
+    }
+
+    /// <summary>Gets the transcode history, most recent first.</summary>
+    /// <returns>The job history.</returns>
+    [HttpGet("Jobs")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<IReadOnlyList<JobDto>> GetJobs()
+    {
+        var jobs = _queue.Snapshot()
+            .OrderByDescending(j => j.CompletedUtc ?? j.EnqueuedUtc)
+            .Take(500)
+            .Select(ToDto)
+            .ToList();
+
+        return jobs;
+    }
+
+    private JobDto ToDto(TranscodeJob job)
+    {
+        var item = TryGetItem(job.ItemId);
+        var saved = job.OutputSize.HasValue ? Math.Max(0, job.SourceSize - job.OutputSize.Value) : 0;
+
+        return new JobDto
+        {
+            Id = job.Id.ToString("N"),
+            ItemId = job.ItemId.ToString("N"),
+            Name = item?.Name ?? Path.GetFileName(job.SourcePath),
+            HasPrimaryImage = item?.HasImage(ImageType.Primary) ?? false,
+            State = job.State.ToString(),
+            SourcePath = job.SourcePath,
+            SourceCodec = job.SourceCodec,
+            OutputCodec = job.OutputCodec,
+            SourceSize = job.SourceSize,
+            OutputSize = job.OutputSize,
+            SavedBytes = saved,
+            Vmaf = job.Vmaf,
+            Error = job.Error,
+            CompletedUtc = job.CompletedUtc?.ToString("o")
+        };
+    }
+
+    private BaseItem? TryGetItem(Guid id)
+    {
+        try
+        {
+            return id == Guid.Empty ? null : _libraryManager.GetItemById(id);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private string[] UsableEncoderNames()
