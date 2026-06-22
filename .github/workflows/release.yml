@@ -1,39 +1,107 @@
 name: Release
 
+# Fully automated release. You only trigger this once with a version + changelog;
+# everything else (version bump, build, zip, checksum, tag, GitHub release and the
+# manifest.json update) happens here with nothing left to do by hand.
+#
+# Trigger it from the Actions tab ("Run workflow") or via the API/an assistant:
+#   gh workflow run release.yml -f version=0.0.4 -f changelog="What changed."
+
 on:
-  push:
-    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version, e.g. 0.0.4 (no leading v)'
+        required: true
+        type: string
+      changelog:
+        description: 'Changelog shown in the release and the plugin catalog'
+        required: true
+        type: string
+      target_abi:
+        description: 'Jellyfin target ABI'
+        required: false
+        default: '10.11.0.0'
+        type: string
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate and compute version
+        id: ver
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version }}"
+          VERSION="${VERSION#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must look like 1.2.3 (got '$VERSION')"
+            exit 1
+          fi
+          {
+            echo "version=$VERSION"
+            echo "version4=${VERSION}.0"
+            echo "tag=v${VERSION}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
 
+      - name: Bump version in csproj and build.yaml
+        run: |
+          set -euo pipefail
+          V4="${{ steps.ver.outputs.version4 }}"
+          CSPROJ="Jellyfin.Plugin.TranscodeReplace/Jellyfin.Plugin.TranscodeReplace.csproj"
+          BUILD="Jellyfin.Plugin.TranscodeReplace/build.yaml"
+          sed -i -E "s#<AssemblyVersion>[0-9.]+</AssemblyVersion>#<AssemblyVersion>${V4}</AssemblyVersion>#" "$CSPROJ"
+          sed -i -E "s#<FileVersion>[0-9.]+</FileVersion>#<FileVersion>${V4}</FileVersion>#" "$CSPROJ"
+          sed -i -E "s#^version: \".*\"#version: \"${V4}\"#" "$BUILD"
+
       - name: Build
         run: dotnet build Jellyfin.Plugin.TranscodeReplace/Jellyfin.Plugin.TranscodeReplace.csproj -c Release
 
-      - name: Package plugin
+      - name: Package plugin and compute checksum
+        id: pkg
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ steps.ver.outputs.version }}"
+          V4="${{ steps.ver.outputs.version4 }}"
+          ABI="${{ inputs.target_abi }}"
           GUID="eff73e61-0320-4bce-bb2c-27fb68604e9d"
           TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           DLL="Jellyfin.Plugin.TranscodeReplace/bin/Release/net9.0/Jellyfin.Plugin.TranscodeReplace.dll"
+          CHANGELOG=$(cat <<'EOF'
+          ${{ inputs.changelog }}
+          EOF
+          )
 
           mkdir -p package
           cp "$DLL" package/
 
           # meta.json so the zip is a valid Jellyfin plugin folder (no .pdb / .deps.json).
-          printf '%s' "{\"category\":\"General\",\"guid\":\"$GUID\",\"name\":\"Transcode & Replace\",\"description\":\"Batch-transcode library media to HEVC/AV1 and atomically replace the original.\",\"overview\":\"Transcode library media and replace the originals, with verification gates.\",\"owner\":\"Kuschel-code\",\"targetAbi\":\"10.11.0.0\",\"framework\":\"net9.0\",\"version\":\"${VERSION}.0\",\"changelog\":\"Release ${VERSION}\",\"timestamp\":\"$TS\"}" > package/meta.json
+          jq -n \
+            --arg guid "$GUID" --arg abi "$ABI" --arg v "$V4" \
+            --arg cl "$CHANGELOG" --arg ts "$TS" \
+            '{category:"General", guid:$guid, name:"Transcode & Replace",
+              description:"Batch-transcode library media to HEVC/AV1/VP9 and atomically replace the original.",
+              overview:"Transcode library media and replace the originals, with verification gates.",
+              owner:"Kuschel-code", targetAbi:$abi, framework:"net9.0",
+              version:$v, changelog:$cl, timestamp:$ts}' > package/meta.json
 
           cd package
           ZIP="transcode-replace_${VERSION}.zip"
@@ -41,15 +109,53 @@ jobs:
           MD5="$(md5sum "$ZIP" | awk '{print $1}')"
           echo "$MD5" > "${ZIP}.md5"
           {
-            echo "### Plugin package"
-            echo "- file: \`$ZIP\` (Jellyfin.Plugin.TranscodeReplace.dll + meta.json)"
-            echo "- md5: \`$MD5\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo "zip=$ZIP"
+            echo "md5=$MD5"
+            echo "ts=$TS"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Update manifest.json
+        run: |
+          set -euo pipefail
+          V4="${{ steps.ver.outputs.version4 }}"
+          ABI="${{ inputs.target_abi }}"
+          MD5="${{ steps.pkg.outputs.md5 }}"
+          TS="${{ steps.pkg.outputs.ts }}"
+          ZIP="${{ steps.pkg.outputs.zip }}"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.ver.outputs.tag }}/${ZIP}"
+          CHANGELOG=$(cat <<'EOF'
+          ${{ inputs.changelog }}
+          EOF
+          )
+
+          # Drop any existing entry for this version (so re-runs are idempotent),
+          # then prepend the new one to the top of the versions list.
+          jq \
+            --arg v "$V4" --arg cl "$CHANGELOG" --arg abi "$ABI" \
+            --arg url "$URL" --arg sum "$MD5" --arg ts "$TS" \
+            '.[0].versions = ([{version:$v, changelog:$cl, targetAbi:$abi, sourceUrl:$url, checksum:$sum, timestamp:$ts}]
+                              + (.[0].versions | map(select(.version != $v))))' \
+            manifest.json > manifest.tmp
+          mv manifest.tmp manifest.json
+
+      - name: Commit version bump and manifest, then tag
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.ver.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Release ${TAG}: bump version and manifest"
+          git tag "$TAG"
+          git push origin main
+          git push origin "$TAG"
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          body: ${{ inputs.changelog }}
           files: |
             package/*.zip
             package/*.md5
