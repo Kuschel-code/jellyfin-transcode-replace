@@ -2,6 +2,8 @@ using System.IO;
 using Jellyfin.Plugin.TranscodeReplace.Encoding;
 using Jellyfin.Plugin.TranscodeReplace.Hardware;
 using Jellyfin.Plugin.TranscodeReplace.Queue;
+using Jellyfin.Plugin.TranscodeReplace.Replace;
+using Jellyfin.Plugin.TranscodeReplace.Verify;
 using Jellyfin.Plugin.TranscodeReplace.Worker;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
@@ -21,6 +23,11 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<HardwareProbe>();
         serviceCollection.AddSingleton<ArgBuilder>();
         serviceCollection.AddSingleton<FfmpegRunner>();
+        serviceCollection.AddSingleton<MediaInfoProbe>();
+        serviceCollection.AddSingleton<VmafGate>();
+        serviceCollection.AddSingleton<FilePermissions>();
+        serviceCollection.AddSingleton<AtomicReplacer>();
+        serviceCollection.AddSingleton<PlaybackGuard>();
 
         // Persistent queue lives in the plugin data folder so it survives restarts.
         serviceCollection.AddSingleton<IJobQueue>(_ =>

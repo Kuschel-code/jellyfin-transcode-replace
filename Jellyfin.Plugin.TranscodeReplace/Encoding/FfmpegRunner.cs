@@ -7,8 +7,10 @@ using Jellyfin.Plugin.TranscodeReplace.Hardware;
 namespace Jellyfin.Plugin.TranscodeReplace.Encoding;
 
 /// <summary>
-/// Runs ffmpeg with a pre-built argument list. Quoting is exposed and pure so
-/// it can be unit tested independently of process execution.
+/// Runs ffmpeg with a pre-built argument list. The list is passed through
+/// <c>ProcessStartInfo.ArgumentList</c> (no shell re-parsing), so file names with
+/// spaces or quotes cannot inject extra arguments. <see cref="Quote"/> exists only
+/// to render a human-readable command line for logs.
 /// </summary>
 public sealed class FfmpegRunner
 {
@@ -20,15 +22,15 @@ public sealed class FfmpegRunner
     /// <param name="runner">Process runner.</param>
     public FfmpegRunner(IProcessRunner runner) => _runner = runner;
 
-    /// <summary>Runs ffmpeg asynchronously.</summary>
+    /// <summary>Runs ffmpeg asynchronously with an injection-safe argument list.</summary>
     /// <param name="ffmpegPath">Path to ffmpeg.</param>
     /// <param name="arguments">Argument list.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The process result.</returns>
     public Task<ProcessResult> RunAsync(string ffmpegPath, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
-        => _runner.RunAsync(ffmpegPath, Quote(arguments), cancellationToken);
+        => _runner.RunAsync(ffmpegPath, arguments, cancellationToken);
 
-    /// <summary>Quotes an argument list into a single command-line string.</summary>
+    /// <summary>Renders an argument list as a single command-line string, for logging only.</summary>
     /// <param name="arguments">Argument list.</param>
     /// <returns>Quoted command line.</returns>
     public static string Quote(IEnumerable<string> arguments) => string.Join(' ', arguments.Select(QuoteOne));

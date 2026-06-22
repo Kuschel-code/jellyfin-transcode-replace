@@ -37,8 +37,14 @@ public sealed class TranscodeJob
     /// <summary>Gets or sets the size of the produced output in bytes, if known.</summary>
     public long? OutputSize { get; set; }
 
+    /// <summary>Gets or sets the backup path retained until the retention window expires.</summary>
+    public string? BackupPath { get; set; }
+
     /// <summary>Gets or sets the UTC enqueue time.</summary>
     public DateTime EnqueuedUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Gets or sets the UTC completion time (Done/Failed/Skipped).</summary>
+    public DateTime? CompletedUtc { get; set; }
 
     /// <summary>Creates a shallow copy.</summary>
     /// <returns>A copy of this job.</returns>

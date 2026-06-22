@@ -1,19 +1,21 @@
 ---
 name: "Transcode & Replace"
 guid: "eff73e61-0320-4bce-bb2c-27fb68604e9d"
-version: "1.0.0.0"
-targetAbi: "10.10.0.0"
-framework: "net8.0"
+version: "0.0.1.0"
+targetAbi: "10.11.0.0"
+framework: "net9.0"
 owner: "Kuschel-code"
 overview: "Batch-transcode library media to HEVC/AV1 and atomically replace the original."
 description: >
   Discovers library media, transcodes it to a target codec using detected
   hardware or software encoders, verifies the result and atomically replaces
   the original file. Includes a persistent job queue, dry-run mode, backup
-  policy and HDR preservation.
+  policy, HDR preservation and an optional VMAF gate.
 category: "General"
 artifacts:
   - "Jellyfin.Plugin.TranscodeReplace.dll"
 changelog: >
-  1.0.0.0 - Initial scaffold (M0-M3): plugin shell, hardware probe,
-  persistent queue, discovery task, ffmpeg argument builder and dry-run worker.
+  0.0.1.0 - First release. Full pipeline: hardware probe, persistent queue,
+  discovery task, ffmpeg arg builder, ffprobe verification gates, optional VMAF
+  gate, HDR/Dolby Vision handling, playback/idle/disk guards and atomic replace
+  with backup and permission preservation. Targets Jellyfin 10.11.

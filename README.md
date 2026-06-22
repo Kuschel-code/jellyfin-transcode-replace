@@ -1,109 +1,111 @@
-# Transcode & Replace — Jellyfin Plugin
+# Transcode & Replace
 
-Batch-transcodes your Jellyfin library to a target codec (HEVC / AV1 / H.264) and
-**replaces the original file in place**, with automatic hardware detection, a
-persistent job queue, verification gates and HDR preservation.
+A Jellyfin plugin that re-encodes the files in your libraries to a smaller codec
+(HEVC by default, AV1 or H.264 optional) and replaces the originals in place. It
+detects which encoders actually work on your machine, runs the jobs from a queue
+that survives restarts, checks every output before it touches anything, and keeps a
+backup of the original until the new file is verified.
 
-> ⚠️ **Replacing originals can lose data if done carelessly.** This plugin is built
-> safety-first: it defaults to **dry-run**, never touches a file unless every
-> verification gate passes, keeps a backup until verified, and replaces atomically
-> within the same filesystem. See [Safety](#safety).
+It is meant for the case where you have a pile of large H.264 files and want them as
+HEVC without re-importing everything or breaking your existing library entries. The
+path stays the same, so the Jellyfin item ID stays the same.
 
-## Status
+## A warning before you turn it on
 
-This repository is being built in milestones (see the architecture plan). Current state:
+This plugin overwrites your media files. That is the whole point, and it is also how
+you lose data if something is wrong. Read this:
 
-| Milestone | Scope | State |
-|---|---|---|
-| **M0** | Plugin shell, config, config page, DI | ✅ |
-| **M1** | Hardware probe (real probe-encode, cached) | ✅ |
-| **M2** | Persistent JSON job queue + discovery task | ✅ |
-| **M3** | ffmpeg argument builder + **dry-run** worker | ✅ |
-| M4 | Verifier (ffprobe gates) | ⏳ |
-| M5 | Atomic replace + backup + permissions + refresh | ⏳ |
-| M6 | Playback / idle / disk guards | ⏳ |
-| M7 | HDR / Dolby Vision handling | ⏳ |
-| M8 | VMAF gate (sample-based) | ⏳ |
-| M9 | Status UI, resume hardening | ⏳ |
+- It starts in dry-run. Nothing is written until you turn that off. The first run
+  only logs what it would do.
+- Before replacing anything it re-probes the new file with ffprobe and checks the
+  codec, the duration (must be within 0.5%), the audio track count and the file size.
+  If any check fails the original is left alone and the temporary file is deleted.
+- With the default replace policy the original is moved to a `.trbak` file first, the
+  new file is moved into place, and the backup is only deleted after the retention
+  window (7 days by default). If the move fails, the backup is rolled back.
+- The temporary file is written in the same folder as the source, so the final move
+  is a rename on one filesystem and is atomic. It never leaves a half-written file at
+  the real path.
+- Dolby Vision is skipped by default because it cannot be preserved through a generic
+  re-encode. HDR10 and HLG are kept (10-bit, BT.2020 metadata passed through).
+- A file that is currently being streamed is skipped until the stream ends.
 
-**M3 writes nothing.** In dry-run it logs the exact ffmpeg command per file. With
-dry-run off it still refuses to encode/replace, because the verify + atomic-replace
-pipeline (M4–M5) is intentionally not wired up yet. The destructive path will only
-exist once it can be verified.
+If you are not sure, leave dry-run on, look at the log, and only then switch it off.
+
+## Requirements
+
+- Jellyfin 10.11 (the plugin targets ABI 10.11.0.0 and .NET 9).
+- The bundled jellyfin-ffmpeg. The plugin uses its ffmpeg/ffprobe, so you don't
+  configure a path.
 
 ## How it works
 
-```
-DiscoveryTask (IScheduledTask)  ── scans libraries, enqueues jobs ──►  JsonJobQueue (persistent)
-                                                                              │
-TranscodeWorker (BackgroundService) ── drains queue ──────────────────────────┘
-        ├─ HardwareProbe   real probe-encode per encoder, cached
-        ├─ ArgBuilder      deterministic ffmpeg args (encoder × HDR × container)
-        └─ FfmpegRunner    (dry-run: log only)
-```
+There are two parts. A scheduled task ("Transcode & Replace: Discover media") walks
+the libraries and adds files to a queue. A background worker takes one job at a time
+and runs it through the pipeline: probe, pick an encoder, encode to a temp file,
+verify, optionally score with VMAF, then replace.
 
-- **Hardware detection** does not trust compiled-in encoder lists. It runs a 1-second
-  `testsrc` probe-encode per candidate and only keeps encoders that exit 0.
-- **The queue is a single JSON file** in the plugin data folder — no external database,
-  no extra native assemblies to deploy. Writes are atomic (`*.tmp` then replace). On
-  restart, in-flight jobs reset to `Pending` (crash resume).
-- **Idempotent**: a file already in the target codec (and above the bitrate floor) is
-  not enqueued.
+Encoder detection does not trust ffmpeg's compiled-in list. For each candidate
+(NVENC, QSV, VAAPI, AMF, VideoToolbox, software) it runs a one-second test encode and
+keeps only the ones that exit cleanly. The result is cached.
+
+The queue is a single JSON file in the plugin data folder. No database, so there are
+no extra native libraries to ship. Writes are atomic. On startup, any job that was
+mid-flight when the server stopped is reset to pending and its leftover temp files are
+removed.
 
 ## Configuration
 
-Dashboard → Plugins → **Transcode & Replace**.
+Dashboard, then Plugins, then Transcode & Replace.
 
-| Setting | Default | Purpose |
-|---|---|---|
-| Dry-run | **on** | Simulate only; never writes |
-| Target video codec | HEVC | h264 / hevc / av1 |
-| Quality (CRF/CQ) | 23 | Lower = better/larger |
-| Quality vs. speed | Quality | Software (libx265) vs. hardware first |
-| Encoder preference | Auto | Auto / ForceSoftware / ForceHardware / Specific |
-| Max parallel jobs | 1 | Keep at 1 for GPU encoders |
-| Audio | Copy | Copy / +AAC / Transcode |
-| Container | Keep | Keep / mkv / mp4 (mp4 falls back to mkv for image subs) |
-| Min source bitrate | 0 | Only process "fat" files |
-| Skip if already target codec | true | Idempotency |
-| Replace policy | BackupThenDelete | vs. SideBySide / HardReplace |
-| Backup retention (days) | 7 | |
-| VMAF gate / threshold | off / 95 | Quality regression guard |
-| Skip HDR / Dolby Vision | off / **on** | DV is not generically preservable |
-| Run only when idle | true | Don't compete with playback |
-
-## Safety
-
-1. **Dry-run by default** — first runs only report.
-2. **Verification gates before any replace** (M4): ffmpeg exit 0, plausible size,
-   valid container, duration within ±0.5 %, expected stream counts; optional VMAF (M8).
-3. **Backup until verified** — hard delete is opt-in only.
-4. **Atomic move within the same filesystem** — never a half-written file at the
-   original path; the temp file is written in the source directory.
-5. **HDR10/HLG preserved, Dolby Vision skipped** — never silently degrades to SDR.
-6. **In-use protection** — never replaces a file that is currently streaming (M6).
+- Dry-run: on by default. Off means it will actually replace files.
+- Target codec: HEVC, AV1 or H.264.
+- Quality (CRF/CQ): 23 is a reasonable HEVC default. Lower means better and larger.
+- Quality vs. speed: prefer software (libx265, best quality per bit) or hardware (fast).
+- Encoder preference: auto, force software, prefer hardware, or a specific encoder name.
+- Max parallel jobs: 1 is recommended, especially for GPU encoders.
+- Audio: copy, copy plus an added AAC track, or transcode to AAC.
+- Container: keep the source container, or force mkv/mp4. mp4 falls back to mkv when
+  the source has image-based subtitles (PGS/VobSub), which mp4 can't hold.
+- Minimum source bitrate: skip files below this, so you only touch the big ones.
+- Skip if already target codec: on, so re-running is safe.
+- Replace policy: backup-then-delete (default), keep side by side, or hard replace.
+- Backup retention: days to keep the `.trbak` backup.
+- VMAF gate: off by default. When on, the output is scored against the source and
+  must be at least the threshold (95) or the job fails and the original is kept.
+- Skip HDR / Skip Dolby Vision: Dolby Vision is skipped by default.
+- Run only when idle: pause while anything is playing.
 
 ## Build
 
-Requires the .NET 8 SDK.
+Needs the .NET 9 SDK.
 
-```bash
+```
 dotnet build -c Release
 dotnet test  -c Release
 ```
 
-The plugin DLL lands in
-`Jellyfin.Plugin.TranscodeReplace/bin/Release/net8.0/Jellyfin.Plugin.TranscodeReplace.dll`.
+The DLL ends up in
+`Jellyfin.Plugin.TranscodeReplace/bin/Release/net9.0/Jellyfin.Plugin.TranscodeReplace.dll`.
 
-## Install (manual)
+## Install
 
-1. Build (above) or download the zip from a release.
-2. Copy `Jellyfin.Plugin.TranscodeReplace.dll` into a folder under your Jellyfin
-   `plugins` directory, e.g. `plugins/Transcode & Replace/`.
-3. Restart Jellyfin. Configure the plugin and **leave dry-run on for the first run.**
+Either grab the zip from a release or build it yourself. The zip contains the DLL and
+a `meta.json`. Put both in a folder under your Jellyfin `plugins` directory, for
+example `plugins/Transcode & Replace/`, then restart Jellyfin. Configure it and leave
+dry-run on for the first run.
 
-Targets Jellyfin `10.10.x` (ABI `10.10.0.0`).
+## Status
+
+Everything described above is implemented: hardware probe, persistent queue and
+discovery, the ffmpeg argument builder, ffprobe verification, the VMAF gate, HDR and
+Dolby Vision handling, the playback/idle/disk guards, atomic replace with backup and
+permission preservation, and a status endpoint for the config page. There are 53 unit
+tests covering the argument builder, the parsers, the verifier and the queue.
+
+This is a 0.0.1 release. It works, but it is replacing your files, so test it on a
+small library first.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

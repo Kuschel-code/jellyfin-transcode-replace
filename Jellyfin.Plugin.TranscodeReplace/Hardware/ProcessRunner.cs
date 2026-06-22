@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
@@ -13,60 +14,95 @@ public sealed class ProcessRunner : IProcessRunner
 {
     /// <inheritdoc />
     public ProcessResult Run(string fileName, string arguments, int timeoutMs = 30000)
-    {
-        using var process = Create(fileName, arguments);
-        var stdout = new StringBuilder();
-        var stderr = new StringBuilder();
-        process.OutputDataReceived += (_, e) => { if (e.Data is not null) { stdout.AppendLine(e.Data); } };
-        process.ErrorDataReceived += (_, e) => { if (e.Data is not null) { stderr.AppendLine(e.Data); } };
-
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-
-        if (!process.WaitForExit(timeoutMs))
-        {
-            TryKill(process);
-            return new ProcessResult(-1, stdout.ToString(), stderr.ToString() + "\n[timed out]");
-        }
-
-        // Ensure async output handlers have flushed.
-        process.WaitForExit();
-        return new ProcessResult(process.ExitCode, stdout.ToString(), stderr.ToString());
-    }
+        => RunSync(CreateWithArguments(fileName, arguments), timeoutMs);
 
     /// <inheritdoc />
-    public async Task<ProcessResult> RunAsync(string fileName, string arguments, CancellationToken cancellationToken = default)
+    public ProcessResult Run(string fileName, IReadOnlyList<string> argumentList, int timeoutMs = 30000)
+        => RunSync(CreateWithArgumentList(fileName, argumentList), timeoutMs);
+
+    /// <inheritdoc />
+    public Task<ProcessResult> RunAsync(string fileName, string arguments, CancellationToken cancellationToken = default)
+        => RunAsyncInternal(CreateWithArguments(fileName, arguments), cancellationToken);
+
+    /// <inheritdoc />
+    public Task<ProcessResult> RunAsync(string fileName, IReadOnlyList<string> argumentList, CancellationToken cancellationToken = default)
+        => RunAsyncInternal(CreateWithArgumentList(fileName, argumentList), cancellationToken);
+
+    private static ProcessResult RunSync(Process process, int timeoutMs)
     {
-        using var process = Create(fileName, arguments);
+        using (process)
+        {
+            var (stdout, stderr) = Attach(process);
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            if (!process.WaitForExit(timeoutMs))
+            {
+                TryKill(process);
+                return new ProcessResult(-1, stdout.ToString(), stderr.ToString() + "\n[timed out]");
+            }
+
+            process.WaitForExit();
+            return new ProcessResult(process.ExitCode, stdout.ToString(), stderr.ToString());
+        }
+    }
+
+    private static async Task<ProcessResult> RunAsyncInternal(Process process, CancellationToken cancellationToken)
+    {
+        using (process)
+        {
+            var (stdout, stderr) = Attach(process);
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                TryKill(process);
+                throw;
+            }
+
+            return new ProcessResult(process.ExitCode, stdout.ToString(), stderr.ToString());
+        }
+    }
+
+    private static (StringBuilder Out, StringBuilder Err) Attach(Process process)
+    {
         var stdout = new StringBuilder();
         var stderr = new StringBuilder();
         process.OutputDataReceived += (_, e) => { if (e.Data is not null) { stdout.AppendLine(e.Data); } };
         process.ErrorDataReceived += (_, e) => { if (e.Data is not null) { stderr.AppendLine(e.Data); } };
-
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-
-        try
-        {
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            TryKill(process);
-            throw;
-        }
-
-        return new ProcessResult(process.ExitCode, stdout.ToString(), stderr.ToString());
+        return (stdout, stderr);
     }
 
-    private static Process Create(string fileName, string arguments) => new()
+    private static Process CreateWithArguments(string fileName, string arguments)
+    {
+        var process = NewProcess(fileName);
+        process.StartInfo.Arguments = arguments;
+        return process;
+    }
+
+    private static Process CreateWithArgumentList(string fileName, IReadOnlyList<string> argumentList)
+    {
+        var process = NewProcess(fileName);
+        foreach (var arg in argumentList)
+        {
+            process.StartInfo.ArgumentList.Add(arg);
+        }
+
+        return process;
+    }
+
+    private static Process NewProcess(string fileName) => new()
     {
         StartInfo = new ProcessStartInfo
         {
             FileName = fileName,
-            Arguments = arguments,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
