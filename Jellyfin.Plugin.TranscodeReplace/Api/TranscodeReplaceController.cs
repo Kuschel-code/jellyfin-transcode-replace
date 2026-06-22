@@ -37,6 +37,12 @@ public sealed class StatusDto
 
     /// <summary>Gets or sets the usable encoder names.</summary>
     public string[] UsableEncoders { get; set; } = Array.Empty<string>();
+
+    /// <summary>Gets or sets a value indicating whether the plugin is in dry-run mode.</summary>
+    public bool DryRun { get; set; }
+
+    /// <summary>Gets or sets a short description of each job currently being processed.</summary>
+    public string[] Active { get; set; } = Array.Empty<string>();
 }
 
 /// <summary>One row of the transcode history shown on the config page.</summary>
@@ -130,15 +136,22 @@ public class TranscodeReplaceController : ControllerBase
             .Where(j => j.State == JobState.Done && j.OutputSize.HasValue)
             .Sum(j => Math.Max(0, j.SourceSize - j.OutputSize!.Value));
 
+        var active = jobs
+            .Where(j => j.State is JobState.Running or JobState.Verifying or JobState.Replacing)
+            .Select(j => Path.GetFileName(j.SourcePath) + " (" + j.State + ")")
+            .ToArray();
+
         return new StatusDto
         {
             QueueLength = jobs.Count(j => j.State == JobState.Pending),
-            Running = jobs.Count(j => j.State is JobState.Running or JobState.Verifying or JobState.Replacing),
+            Running = active.Length,
             Done = jobs.Count(j => j.State == JobState.Done),
             Failed = jobs.Count(j => j.State == JobState.Failed),
             Skipped = jobs.Count(j => j.State == JobState.Skipped),
             SavedBytes = saved,
-            UsableEncoders = UsableEncoderNames()
+            UsableEncoders = UsableEncoderNames(),
+            DryRun = Plugin.Instance?.Configuration.DryRun ?? true,
+            Active = active
         };
     }
 
