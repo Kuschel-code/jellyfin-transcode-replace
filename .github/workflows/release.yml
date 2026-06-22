@@ -1,28 +1,19 @@
 name: Release
 
-# Fully automated release. You only trigger this once with a version + changelog;
-# everything else (version bump, build, zip, checksum, tag, GitHub release and the
-# manifest.json update) happens here with nothing left to do by hand.
+# Fully automated, tag-driven release. You only create an annotated tag whose
+# message is the changelog and push it; everything else happens here:
 #
-# Trigger it from the Actions tab ("Run workflow") or via the API/an assistant:
-#   gh workflow run release.yml -f version=0.0.4 -f changelog="What changed."
+#   git tag -a v0.0.4 -m "What changed in this release."
+#   git push origin v0.0.4
+#
+# The workflow then bumps the csproj/build.yaml version, builds, packages the
+# zip, computes the md5, publishes a GitHub release with the zip, and updates
+# manifest.json on main with the real checksum and download URL. Nothing to do
+# by hand. Re-tagging a version overwrites its manifest entry idempotently.
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version, e.g. 0.0.4 (no leading v)'
-        required: true
-        type: string
-      changelog:
-        description: 'Changelog shown in the release and the plugin catalog'
-        required: true
-        type: string
-      target_abi:
-        description: 'Jellyfin target ABI'
-        required: false
-        default: '10.11.0.0'
-        type: string
+  push:
+    tags: [ 'v*' ]
 
 permissions:
   contents: write
@@ -41,20 +32,30 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Validate and compute version
-        id: ver
+      - name: Resolve version and changelog from the tag
+        id: meta
         run: |
           set -euo pipefail
-          VERSION="${{ inputs.version }}"
-          VERSION="${VERSION#v}"
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::version must look like 1.2.3 (got '$VERSION')"
+            echo "::error::tag must look like v1.2.3 (got '$TAG')"
             exit 1
           fi
+          git fetch --tags --force --quiet
+          CL="${RUNNER_TEMP}/changelog.txt"
+          git for-each-ref "refs/tags/${TAG}" --format='%(contents)' > "$CL"
+          # Drop a signature block if the tag is signed, and fall back to a default
+          # if the tag message is empty (e.g. a lightweight tag).
+          sed -i '/-----BEGIN PGP SIGNATURE-----/,$d' "$CL"
+          if ! grep -q '[^[:space:]]' "$CL"; then
+            printf 'Release %s\n' "$TAG" > "$CL"
+          fi
           {
+            echo "tag=$TAG"
             echo "version=$VERSION"
             echo "version4=${VERSION}.0"
-            echo "tag=v${VERSION}"
+            echo "changelog_file=$CL"
           } >> "$GITHUB_OUTPUT"
 
       - name: Setup .NET
@@ -65,7 +66,7 @@ jobs:
       - name: Bump version in csproj and build.yaml
         run: |
           set -euo pipefail
-          V4="${{ steps.ver.outputs.version4 }}"
+          V4="${{ steps.meta.outputs.version4 }}"
           CSPROJ="Jellyfin.Plugin.TranscodeReplace/Jellyfin.Plugin.TranscodeReplace.csproj"
           BUILD="Jellyfin.Plugin.TranscodeReplace/build.yaml"
           sed -i -E "s#<AssemblyVersion>[0-9.]+</AssemblyVersion>#<AssemblyVersion>${V4}</AssemblyVersion>#" "$CSPROJ"
@@ -79,16 +80,13 @@ jobs:
         id: pkg
         run: |
           set -euo pipefail
-          VERSION="${{ steps.ver.outputs.version }}"
-          V4="${{ steps.ver.outputs.version4 }}"
-          ABI="${{ inputs.target_abi }}"
+          VERSION="${{ steps.meta.outputs.version }}"
+          V4="${{ steps.meta.outputs.version4 }}"
+          ABI="10.11.0.0"
           GUID="eff73e61-0320-4bce-bb2c-27fb68604e9d"
           TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           DLL="Jellyfin.Plugin.TranscodeReplace/bin/Release/net9.0/Jellyfin.Plugin.TranscodeReplace.dll"
-          CHANGELOG=$(cat <<'EOF'
-          ${{ inputs.changelog }}
-          EOF
-          )
+          CHANGELOG="$(cat "${{ steps.meta.outputs.changelog_file }}")"
 
           mkdir -p package
           cp "$DLL" package/
@@ -112,23 +110,21 @@ jobs:
             echo "zip=$ZIP"
             echo "md5=$MD5"
             echo "ts=$TS"
+            echo "abi=$ABI"
           } >> "$GITHUB_OUTPUT"
 
       - name: Update manifest.json
         run: |
           set -euo pipefail
-          V4="${{ steps.ver.outputs.version4 }}"
-          ABI="${{ inputs.target_abi }}"
+          V4="${{ steps.meta.outputs.version4 }}"
+          ABI="${{ steps.pkg.outputs.abi }}"
           MD5="${{ steps.pkg.outputs.md5 }}"
           TS="${{ steps.pkg.outputs.ts }}"
           ZIP="${{ steps.pkg.outputs.zip }}"
-          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.ver.outputs.tag }}/${ZIP}"
-          CHANGELOG=$(cat <<'EOF'
-          ${{ inputs.changelog }}
-          EOF
-          )
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.meta.outputs.tag }}/${ZIP}"
+          CHANGELOG="$(cat "${{ steps.meta.outputs.changelog_file }}")"
 
-          # Drop any existing entry for this version (so re-runs are idempotent),
+          # Drop any existing entry for this version (so re-tagging is idempotent),
           # then prepend the new one to the top of the versions list.
           jq \
             --arg v "$V4" --arg cl "$CHANGELOG" --arg abi "$ABI" \
@@ -138,24 +134,25 @@ jobs:
             manifest.json > manifest.tmp
           mv manifest.tmp manifest.json
 
-      - name: Commit version bump and manifest, then tag
+      - name: Commit version bump and manifest to main
         run: |
           set -euo pipefail
-          TAG="${{ steps.ver.outputs.tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Release ${TAG}: bump version and manifest"
-          git tag "$TAG"
-          git push origin main
-          git push origin "$TAG"
+          if git diff --cached --quiet; then
+            echo "No manifest/version changes to commit."
+          else
+            git commit -m "Release ${{ steps.meta.outputs.tag }}: bump version and manifest"
+            git push origin HEAD:main
+          fi
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.ver.outputs.tag }}
-          name: ${{ steps.ver.outputs.tag }}
-          body: ${{ inputs.changelog }}
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          body_path: ${{ steps.meta.outputs.changelog_file }}
           files: |
             package/*.zip
             package/*.md5
