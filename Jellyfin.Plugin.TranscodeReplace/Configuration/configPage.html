@@ -402,10 +402,14 @@
                     qs('trHistRefresh').addEventListener('click', loadHistory);
                     page.querySelector('.trConfigForm').addEventListener('submit', saveConfig);
 
-                    // Jellyfin 10.11 dispatches viewshow/viewhide on the page element (not the
-                    // legacy pageshow/pagehide). Bind both, and also run once immediately in case
-                    // the view was already shown before this inline script attached its listeners.
+                    // The official Jellyfin plugin template loads on 'pageshow', which the
+                    // dashboard dispatches on the config page element; bind that as the primary
+                    // event. Also bind 'viewshow' as a fallback for any view-lifecycle variant,
+                    // and run once immediately so the page populates even if it was shown before
+                    // this inline script attached its listeners.
+                    page.addEventListener('pageshow', activate);
                     page.addEventListener('viewshow', activate);
+                    page.addEventListener('pagehide', stopTimers);
                     page.addEventListener('viewhide', stopTimers);
                     page.addEventListener('viewdestroy', stopTimers);
                     activate();
