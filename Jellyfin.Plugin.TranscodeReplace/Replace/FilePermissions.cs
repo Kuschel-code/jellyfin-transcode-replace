@@ -78,4 +78,30 @@ public sealed class FilePermissions
             }
         }
     }
+
+    /// <summary>
+    /// Tries to create a hardlink. Returns false when the platform or filesystem
+    /// cannot do it (Windows, SMB, cross-device), so the caller can fall back to a
+    /// copy.
+    /// </summary>
+    /// <param name="source">Existing file.</param>
+    /// <param name="link">New link path.</param>
+    /// <returns>True if the link was created.</returns>
+    public bool TryHardLink(string source, string link)
+    {
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+        {
+            return false;
+        }
+
+        try
+        {
+            var result = _runner.Run("ln", new[] { source, link }, 5000);
+            return result.ExitCode == 0 && File.Exists(link);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
 }

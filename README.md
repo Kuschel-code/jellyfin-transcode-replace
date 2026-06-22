@@ -20,9 +20,11 @@ you lose data if something is wrong. Read this:
 - Before replacing anything it re-probes the new file with ffprobe and checks the
   codec, the duration (must be within 0.5%), the audio track count and the file size.
   If any check fails the original is left alone and the temporary file is deleted.
-- With the default replace policy the original is moved to a `.trbak` file first, the
-  new file is moved into place, and the backup is only deleted after the retention
-  window (7 days by default). If the move fails, the backup is rolled back.
+- With the default replace policy the original is backed up first (a hardlink when the
+  filesystem allows it, otherwise a copy), then the new file is swapped in with a single
+  atomic rename. The source path is never empty, even if the server crashes mid-replace;
+  on the next start an interrupted replace is detected and the original is restored from
+  its backup. The backup is deleted after the retention window (7 days by default).
 - The temporary file is written in the same folder as the source, so the final move
   is a rename on one filesystem and is atomic. It never leaves a half-written file at
   the real path.

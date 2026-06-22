@@ -151,22 +151,27 @@ public sealed class AtomicReplacer
             File.Delete(backup);
         }
 
-        // Step 1: park the original safely (atomic rename).
-        File.Move(source, backup);
+        // Back up the original without removing it from its path: a hardlink when the
+        // filesystem supports it (no data copied), otherwise a full copy. The source
+        // stays in place throughout.
+        if (!_permissions.TryHardLink(source, backup))
+        {
+            File.Copy(source, backup, overwrite: true);
+        }
 
         try
         {
-            // Step 2: move the verified output into place (atomic rename, same dir/FS).
-            File.Move(tempPath, source, overwrite: false);
+            // One atomic rename over the source (temp is co-located, so this is a
+            // rename(2)). The old inode survives through the backup link/copy, so the
+            // source path always resolves to either the old or the new file, never to
+            // nothing.
+            File.Move(tempPath, source, overwrite: true);
         }
         catch
         {
-            // Roll back: restore the original from backup.
-            if (!File.Exists(source) && File.Exists(backup))
-            {
-                File.Move(backup, source);
-            }
-
+            // The destructive step never began: the source is still the original.
+            // Drop the backup we just created so we don't leave a stray .trbak.
+            TryDelete(backup);
             throw;
         }
 
