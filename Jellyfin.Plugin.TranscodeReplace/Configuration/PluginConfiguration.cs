@@ -13,7 +13,10 @@ public enum TargetVideoCodec
     Hevc,
 
     /// <summary>AV1.</summary>
-    Av1
+    Av1,
+
+    /// <summary>VP9.</summary>
+    Vp9
 }
 
 /// <summary>How the encoder is chosen.</summary>
@@ -52,7 +55,13 @@ public enum AudioHandling
     AddAac,
 
     /// <summary>Transcode audio to AAC.</summary>
-    Transcode
+    Transcode,
+
+    /// <summary>Copy original and add a compatibility Opus track.</summary>
+    AddOpus,
+
+    /// <summary>Transcode audio to Opus.</summary>
+    TranscodeOpus
 }
 
 /// <summary>Preferred output container.</summary>
@@ -65,7 +74,10 @@ public enum ContainerPreference
     Mkv,
 
     /// <summary>MP4.</summary>
-    Mp4
+    Mp4,
+
+    /// <summary>WebM (VP9/AV1 video, Opus/Vorbis audio, WebVTT subtitles).</summary>
+    Webm
 }
 
 /// <summary>How the original file is replaced.</summary>

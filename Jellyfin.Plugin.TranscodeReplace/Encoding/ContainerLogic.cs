@@ -25,14 +25,17 @@ public static class ContainerLogic
         {
             ContainerPreference.Mkv => "mkv",
             ContainerPreference.Mp4 => "mp4",
+            ContainerPreference.Webm => "webm",
             _ => Normalize(source.Container)
         };
 
+        // Neither mp4 nor webm can carry image-based subtitles (PGS/VobSub); fall
+        // back to mkv rather than silently dropping the subtitle streams.
         string? reason = null;
-        if (ext == "mp4" && source.HasImageSubtitles)
+        if ((ext == "mp4" || ext == "webm") && source.HasImageSubtitles)
         {
+            reason = $"Source has image-based subtitles (PGS/VobSub); {ext} cannot carry them, kept mkv.";
             ext = "mkv";
-            reason = "Source has image-based subtitles (PGS/VobSub); mp4 cannot carry them, kept mkv.";
         }
 
         return new ContainerDecision(ext, ext == "mp4", reason);

@@ -106,6 +106,7 @@
                                 <option value="H264">H.264</option>
                                 <option value="Hevc">HEVC</option>
                                 <option value="Av1">AV1</option>
+                                <option value="Vp9">VP9</option>
                             </select>
                         </div>
                         <div class="inputContainer">
@@ -152,6 +153,8 @@
                                 <option value="Copy">Copy</option>
                                 <option value="AddAac">Copy + add AAC</option>
                                 <option value="Transcode">Transcode to AAC</option>
+                                <option value="AddOpus">Copy + add Opus</option>
+                                <option value="TranscodeOpus">Transcode to Opus</option>
                             </select>
                         </div>
                         <div class="selectContainer">
@@ -160,6 +163,7 @@
                                 <option value="Keep">Keep source</option>
                                 <option value="Mkv">MKV</option>
                                 <option value="Mp4">MP4 (falls back to MKV for image subs)</option>
+                                <option value="Webm">WebM (VP9/AV1 + Opus; falls back to MKV for image subs)</option>
                             </select>
                         </div>
                     </div>

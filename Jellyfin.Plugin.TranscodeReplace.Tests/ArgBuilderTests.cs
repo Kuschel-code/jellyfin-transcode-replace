@@ -118,4 +118,69 @@ public class ArgBuilderTests
 
         AssertSeq(result.Arguments, "-c:a", "aac", "-b:a", "256k");
     }
+
+    [Fact]
+    public void Audio_TranscodeOpus_Mode_Emits_Libopus()
+    {
+        var config = new PluginConfiguration { AudioMode = AudioHandling.TranscodeOpus };
+
+        var result = _builder.Build(Job("/media/Movie.mkv"), MediaSummary.Minimal("/media/Movie.mkv"),
+            config, SwHevc, "slow");
+
+        AssertSeq(result.Arguments, "-c:a", "libopus", "-b:a", "192k");
+    }
+
+    [Fact]
+    public void Audio_AddOpus_Keeps_Originals_And_Appends_Opus_Track()
+    {
+        var source = new MediaSummary { Container = "mkv", AudioStreamCount = 2 };
+        var config = new PluginConfiguration { AudioMode = AudioHandling.AddOpus };
+
+        var result = _builder.Build(Job("/media/Movie.mkv"), source, config, SwHevc, "slow");
+
+        AssertSeq(result.Arguments, "-c:a", "copy", "-map", "0:a:0?", "-c:a:2", "libopus", "-b:a:2", "192k");
+    }
+
+    [Fact]
+    public void Software_Vp9_Uses_Crf_With_Constant_Quality_Bitrate()
+    {
+        var vp9 = new EncoderCap("libvpx-vp9", HwKind.Software, TargetVideoCodec.Vp9, true, true);
+
+        var result = _builder.Build(Job("/media/Movie.mkv"), MediaSummary.Minimal("/media/Movie.mkv"),
+            new PluginConfiguration { TargetVideoCodec = TargetVideoCodec.Vp9 }, vp9, "slow");
+
+        AssertSeq(result.Arguments, "-c:v", "libvpx-vp9", "-crf", "23", "-b:v", "0",
+            "-deadline", "good", "-cpu-used", "1", "-row-mt", "1", "-pix_fmt", "yuv420p");
+    }
+
+    [Fact]
+    public void Webm_Container_Uses_Webvtt_Subtitles()
+    {
+        var source = new MediaSummary { Container = "mkv", AudioStreamCount = 1 };
+        var config = new PluginConfiguration { PreferredContainer = ContainerPreference.Webm };
+
+        var result = _builder.Build(Job("/media/Movie.mkv"), source, config, SwHevc, "slow");
+
+        Assert.Equal("webm", result.FinalExtension);
+        Assert.EndsWith(".webm", result.TempOutputPath);
+        AssertSeq(result.Arguments, "-c:s", "webvtt");
+    }
+
+    [Fact]
+    public void Webm_With_Image_Subs_Falls_Back_To_Mkv()
+    {
+        var source = new MediaSummary
+        {
+            Container = "mkv",
+            SubtitleCodecs = new[] { "hdmv_pgs_subtitle" },
+            AudioStreamCount = 1
+        };
+        var config = new PluginConfiguration { PreferredContainer = ContainerPreference.Webm };
+
+        var result = _builder.Build(Job("/media/Movie.mkv"), source, config, SwHevc, "slow");
+
+        Assert.Equal("mkv", result.FinalExtension);
+        Assert.NotNull(result.ContainerFallbackReason);
+        AssertSeq(result.Arguments, "-c:s", "copy");
+    }
 }

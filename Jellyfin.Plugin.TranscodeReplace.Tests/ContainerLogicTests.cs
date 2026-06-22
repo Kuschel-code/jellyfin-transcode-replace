@@ -39,4 +39,22 @@ public class ContainerLogicTests
         Assert.False(decision.FastStart);
         Assert.NotNull(decision.Reason);
     }
+
+    [Fact]
+    public void Webm_Without_Image_Subs_Stays_Webm_Without_Faststart()
+    {
+        var decision = ContainerLogic.Resolve(ContainerPreference.Webm, new MediaSummary { Container = "mkv" });
+        Assert.Equal("webm", decision.Extension);
+        Assert.False(decision.FastStart);
+        Assert.Null(decision.Reason);
+    }
+
+    [Fact]
+    public void Webm_With_Pgs_Falls_Back_To_Mkv()
+    {
+        var source = new MediaSummary { Container = "mkv", SubtitleCodecs = new[] { "hdmv_pgs_subtitle" } };
+        var decision = ContainerLogic.Resolve(ContainerPreference.Webm, source);
+        Assert.Equal("mkv", decision.Extension);
+        Assert.NotNull(decision.Reason);
+    }
 }

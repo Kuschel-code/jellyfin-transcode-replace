@@ -1,7 +1,7 @@
 # Transcode & Replace
 
 A Jellyfin plugin that re-encodes the files in your libraries to a smaller codec
-(HEVC by default, AV1 or H.264 optional) and replaces the originals in place. It
+(HEVC by default, AV1, VP9 or H.264 optional) and replaces the originals in place. It
 detects which encoders actually work on your machine, runs the jobs from a queue
 that survives restarts, checks every output before it touches anything, and keeps a
 backup of the original until the new file is verified.
@@ -61,14 +61,15 @@ removed.
 Dashboard, then Plugins, then Transcode & Replace.
 
 - Dry-run: on by default. Off means it will actually replace files.
-- Target codec: HEVC, AV1 or H.264.
+- Target codec: HEVC, AV1, VP9 or H.264.
 - Quality (CRF/CQ): 23 is a reasonable HEVC default. Lower means better and larger.
 - Quality vs. speed: prefer software (libx265, best quality per bit) or hardware (fast).
 - Encoder preference: auto, force software, prefer hardware, or a specific encoder name.
 - Max parallel jobs: 1 is recommended, especially for GPU encoders.
-- Audio: copy, copy plus an added AAC track, or transcode to AAC.
-- Container: keep the source container, or force mkv/mp4. mp4 falls back to mkv when
-  the source has image-based subtitles (PGS/VobSub), which mp4 can't hold.
+- Audio: copy, copy plus an added AAC or Opus track, or transcode to AAC or Opus.
+- Container: keep the source container, or force mkv/mp4/webm. mp4 and webm fall back
+  to mkv when the source has image-based subtitles (PGS/VobSub), which they can't hold.
+  webm pairs with VP9/AV1 video and Opus audio.
 - Minimum source bitrate: skip files below this, so you only touch the big ones.
 - Skip if already target codec: on, so re-running is safe.
 - Replace policy: backup-then-delete (default), keep side by side, or hard replace.

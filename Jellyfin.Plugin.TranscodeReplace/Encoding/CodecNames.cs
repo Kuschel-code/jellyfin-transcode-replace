@@ -16,6 +16,7 @@ public static class CodecNames
         TargetVideoCodec.H264 => "h264",
         TargetVideoCodec.Hevc => "hevc",
         TargetVideoCodec.Av1 => "av1",
+        TargetVideoCodec.Vp9 => "vp9",
         _ => "hevc"
     };
 
