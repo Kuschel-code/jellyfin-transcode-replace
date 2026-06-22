@@ -1,0 +1,21 @@
+[
+  {
+    "guid": "eff73e61-0320-4bce-bb2c-27fb68604e9d",
+    "name": "Transcode & Replace",
+    "description": "Batch-transcode library media to HEVC/AV1 and atomically replace the original file, with hardware detection, verification gates, HDR preservation and a persistent job queue.",
+    "overview": "Transcode library media and replace the originals, safely.",
+    "owner": "Kuschel-code",
+    "category": "General",
+    "imageUrl": "",
+    "versions": [
+      {
+        "version": "0.0.1.0",
+        "changelog": "First release. Full pipeline: hardware probe, persistent queue, discovery task, ffprobe verification gates, optional VMAF gate, HDR/Dolby Vision handling, playback/idle/disk guards and atomic replace with backup and permission preservation.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Kuschel-code/jellyfin-transcode-replace/releases/download/v0.0.1/transcode-replace_0.0.1.zip",
+        "checksum": "3f7b160e9130c32c564126d713bd454b",
+        "timestamp": "2026-06-22T07:59:46Z"
+      }
+    ]
+  }
+]

@@ -90,10 +90,24 @@ The DLL ends up in
 
 ## Install
 
-Either grab the zip from a release or build it yourself. The zip contains the DLL and
-a `meta.json`. Put both in a folder under your Jellyfin `plugins` directory, for
-example `plugins/Transcode & Replace/`, then restart Jellyfin. Configure it and leave
-dry-run on for the first run.
+### From the plugin repository (recommended)
+
+In Jellyfin: Dashboard, Plugins, Repositories, add a repository with this URL:
+
+```
+https://raw.githubusercontent.com/Kuschel-code/jellyfin-transcode-replace/main/manifest.json
+```
+
+Then go to Catalog, find "Transcode & Replace", install it and restart Jellyfin.
+Updates show up in the catalog automatically.
+
+### Manual
+
+Grab the zip from a release or build it yourself. The zip contains the DLL and a
+`meta.json`. Put both in a folder under your Jellyfin `plugins` directory, for example
+`plugins/Transcode & Replace/`, then restart Jellyfin.
+
+Either way, configure it and leave dry-run on for the first run.
 
 ## Status
 
