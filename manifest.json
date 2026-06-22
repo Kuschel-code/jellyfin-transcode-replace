@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.0.4.0",
+        "changelog": "Adds VP9 (libvpx-vp9, vp9_qsv, vp9_vaapi), Opus audio (transcode or add a compatibility track) and a WebM container option. Fixes the configuration page so settings load and save again, shows the detected encoders and a live processing/dry-run status, and adds the plugin to the dashboard sidebar.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Kuschel-code/jellyfin-transcode-replace/releases/download/v0.0.4/transcode-replace_0.0.4.zip",
+        "checksum": "f4976886dd9de34ef3dd15898372d245",
+        "timestamp": "2026-06-22T22:39:54Z"
+      },
+      {
         "version": "0.0.3.0",
         "changelog": "Crash-safe replace: the original is backed up by hardlink/copy and the new file is swapped in with one atomic rename, so the source path is never empty; an interrupted replace is recovered on startup.",
         "targetAbi": "10.11.0.0",
