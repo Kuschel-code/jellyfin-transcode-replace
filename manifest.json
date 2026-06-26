@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.0.7.0",
+        "changelog": "Reworked settings page. Cards are reordered into a natural flow with the master dry-run switch on top and the dangerous replace policy at the bottom above Save. Controls that don't apply right now (specific encoder, VMAF threshold, backup retention, the hard-replace warning) are hidden until they're relevant. Quality guidance now adapts to the chosen codec instead of a one-size HEVC hint. The settings that had no UI are now exposed: include/exclude path globs and a library multi-select, plus a Skipped counter and clickable detected-encoder chips. Library scoping is now actually enforced (and fails closed). Also fixes a stuck loading spinner on save errors and an empty-number-field footgun. 77 tests.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Kuschel-code/jellyfin-transcode-replace/releases/download/v0.0.7/transcode-replace_0.0.7.zip",
+        "checksum": "1e2105a7e8a40d548cf9ed81435b75f6",
+        "timestamp": "2026-06-26T21:18:19Z"
+      },
+      {
         "version": "0.0.6.0",
         "changelog": "Review hardening from a full re-review. The VMAF quality gate now fails closed when the score can't be computed (libvmaf missing, ffmpeg error, resolution mismatch) instead of replacing the original anyway. The worker skips a source that already probes as the target codec, which self-corrects a job re-queued after a crash mid-replace. Fixed a 10-bit pixel-format false positive (yuv410p is 8-bit, not 10-bit). Added logging for a corrupt job queue and for permission (chmod/chown) failures, which matters on TrueNAS/SMB. Sealed the API controller. Also adds docs/COMPARISON.md comparing this plugin to Tdarr, Unmanic, FileFlows and HandBrake.",
         "targetAbi": "10.11.0.0",
