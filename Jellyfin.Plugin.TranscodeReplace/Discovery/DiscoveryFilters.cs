@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using Jellyfin.Plugin.TranscodeReplace.Configuration;
 using Jellyfin.Plugin.TranscodeReplace.Encoding;
@@ -49,5 +51,29 @@ public static class DiscoveryFilters
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Whether an item passes the library scope. An empty include list means all
+    /// libraries are allowed; otherwise the item must belong to one of them.
+    /// </summary>
+    /// <param name="itemLibraryIds">Library (collection folder) ids the item belongs to.</param>
+    /// <param name="includedLibraryIds">Configured included library ids (strings).</param>
+    /// <returns>True if the item is in scope.</returns>
+    public static bool PassesLibraryScope(IReadOnlyCollection<Guid> itemLibraryIds, string[] includedLibraryIds)
+    {
+        if (includedLibraryIds is null || includedLibraryIds.Length == 0)
+        {
+            return true;
+        }
+
+        var allowed = includedLibraryIds
+            .Select(s => Guid.TryParse(s, out var g) ? g : Guid.Empty)
+            .Where(g => g != Guid.Empty)
+            .ToHashSet();
+
+        // A non-empty configured list is an explicit restriction: honour it strictly.
+        // If nothing parsed, match nothing (fail closed) rather than processing every file.
+        return itemLibraryIds.Any(allowed.Contains);
     }
 }

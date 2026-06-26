@@ -1,3 +1,4 @@
+using System;
 using Jellyfin.Plugin.TranscodeReplace.Configuration;
 using Jellyfin.Plugin.TranscodeReplace.Discovery;
 using Xunit;
@@ -48,5 +49,32 @@ public class DiscoveryFiltersTests
         var config = new PluginConfiguration { PathIncludeGlobs = new[] { "**/*.mkv" } };
         Assert.True(DiscoveryFilters.PassesPathFilters("/media/Movies/A.mkv", config));
         Assert.False(DiscoveryFilters.PassesPathFilters("/media/Movies/A.mp4", config));
+    }
+
+    [Fact]
+    public void PassesLibraryScope_Allows_All_When_Empty()
+    {
+        Assert.True(DiscoveryFilters.PassesLibraryScope(new[] { Guid.NewGuid() }, Array.Empty<string>()));
+    }
+
+    [Fact]
+    public void PassesLibraryScope_Matches_Included_Library()
+    {
+        var lib = Guid.NewGuid();
+        Assert.True(DiscoveryFilters.PassesLibraryScope(new[] { lib }, new[] { lib.ToString() }));
+    }
+
+    [Fact]
+    public void PassesLibraryScope_Rejects_Item_Outside_Scope()
+    {
+        var lib = Guid.NewGuid();
+        Assert.False(DiscoveryFilters.PassesLibraryScope(new[] { Guid.NewGuid() }, new[] { lib.ToString() }));
+    }
+
+    [Fact]
+    public void PassesLibraryScope_Fails_Closed_On_Unparseable_Ids()
+    {
+        // A configured-but-garbage list must not silently process everything.
+        Assert.False(DiscoveryFilters.PassesLibraryScope(new[] { Guid.NewGuid() }, new[] { "not-a-guid" }));
     }
 }

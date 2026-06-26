@@ -57,8 +57,8 @@ public class DiscoveryTask : IScheduledTask
 
         if (config.IncludedLibraryIds.Length > 0)
         {
-            _logger.LogWarning(
-                "IncludedLibraryIds is set but library scoping is not enforced yet; scanning all libraries.");
+            _logger.LogInformation(
+                "Discovery scoped to {Count} configured library(ies).", config.IncludedLibraryIds.Length);
         }
 
         var query = new InternalItemsQuery
@@ -112,6 +112,15 @@ public class DiscoveryTask : IScheduledTask
         if (string.IsNullOrEmpty(path) || !File.Exists(path))
         {
             return false;
+        }
+
+        if (config.IncludedLibraryIds.Length > 0)
+        {
+            var libraryIds = _libraryManager.GetCollectionFolders(item).Select(f => f.Id).ToList();
+            if (!DiscoveryFilters.PassesLibraryScope(libraryIds, config.IncludedLibraryIds))
+            {
+                return false;
+            }
         }
 
         if (!DiscoveryFilters.PassesPathFilters(path, config))

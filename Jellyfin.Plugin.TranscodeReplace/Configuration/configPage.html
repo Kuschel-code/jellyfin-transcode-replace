@@ -18,20 +18,32 @@
                 #TranscodeReplaceConfigPage .trTab.trTabActive { opacity: 1; border-bottom-color: var(--tr-accent); font-weight: 600; }
                 #TranscodeReplaceConfigPage .trCard { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
                     border-radius: 10px; padding: 1.1em 1.2em; margin-bottom: 1.1em; }
-                #TranscodeReplaceConfigPage .trCard h3 { margin: 0 0 .9em; font-size: 1.05em; }
-                #TranscodeReplaceConfigPage .trStats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px,1fr)); gap: .8em; }
+                #TranscodeReplaceConfigPage .trCard h3 { margin: 0 0 .25em; font-size: 1.05em; }
+                #TranscodeReplaceConfigPage .trCardSub { opacity: .55; font-size: .85em; margin: 0 0 1em; }
+                #TranscodeReplaceConfigPage .trStats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px,1fr)); gap: .8em; }
                 #TranscodeReplaceConfigPage .trStat { text-align: center; }
                 #TranscodeReplaceConfigPage .trStatNum { font-size: 1.7em; font-weight: 700; line-height: 1.1; }
                 #TranscodeReplaceConfigPage .trStatLbl { opacity: .6; font-size: .82em; text-transform: uppercase; letter-spacing: .04em; }
-                #TranscodeReplaceConfigPage .trEnc { margin-top: .9em; opacity: .75; font-size: .9em; }
-                #TranscodeReplaceConfigPage .trDry { color: #f0ad4e; font-weight: 600; }
+                #TranscodeReplaceConfigPage .trEnc { margin-top: .9em; opacity: .8; font-size: .9em; }
+                #TranscodeReplaceConfigPage .trChip { display: inline-block; font-family: monospace; font-size: .82em; cursor: pointer;
+                    background: rgba(0,164,220,.18); color: #7fd6f3; padding: .12em .5em; border-radius: 5px; margin: .15em .2em 0 0; }
+                #TranscodeReplaceConfigPage .trChip:hover { background: rgba(0,164,220,.35); }
                 #TranscodeReplaceConfigPage .trActive { margin-top: .9em; font-size: .92em; }
                 #TranscodeReplaceConfigPage .trActiveOn { color: #66bb6a; font-weight: 600; }
                 #TranscodeReplaceConfigPage .trActiveIdle { opacity: .55; }
                 #TranscodeReplaceConfigPage .trDot { display: inline-block; width: .6em; height: .6em; border-radius: 50%;
                     background: #66bb6a; margin-right: .5em; vertical-align: middle; animation: trPulse 1.2s ease-in-out infinite; }
-                #TranscodeReplaceConfigPage .trDryBanner { color: #f0ad4e; font-weight: 600; margin-top: .6em; }
                 @keyframes trPulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+
+                #TranscodeReplaceConfigPage .trDryCard { border-color: rgba(240,173,78,.5); background: rgba(240,173,78,.08); }
+                #TranscodeReplaceConfigPage .trDry { color: #f0ad4e; font-weight: 600; }
+                #TranscodeReplaceConfigPage .trWarn { border: 1px solid rgba(229,57,53,.6); background: rgba(229,57,53,.1);
+                    color: #ef9a9a; border-radius: 8px; padding: .7em .9em; margin: .2em 0 1em; font-size: .9em; }
+                #TranscodeReplaceConfigPage .trLiveWarn { border: 1px solid rgba(229,57,53,.6); background: rgba(229,57,53,.1);
+                    color: #ef9a9a; border-radius: 8px; padding: .7em .9em; margin: 0 0 1em; font-weight: 600; }
+                #TranscodeReplaceConfigPage .trLibs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: .3em .9em; margin: .3em 0 .2em; }
+                #TranscodeReplaceConfigPage .trLibItem { display: flex; align-items: center; }
+                #TranscodeReplaceConfigPage textarea.emby-input { width: 100%; min-height: 4.5em; font-family: monospace; }
 
                 #TranscodeReplaceConfigPage .trHistBar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1em; }
                 #TranscodeReplaceConfigPage .trHistTotal { font-size: 1.2em; font-weight: 600; }
@@ -71,6 +83,7 @@
                         <div class="trStat"><div class="trStatNum" id="trQueueLen">–</div><div class="trStatLbl">Queue</div></div>
                         <div class="trStat"><div class="trStatNum" id="trRunning">–</div><div class="trStatLbl">Running</div></div>
                         <div class="trStat"><div class="trStatNum" id="trDone">–</div><div class="trStatLbl">Done</div></div>
+                        <div class="trStat"><div class="trStatNum" id="trSkipped">–</div><div class="trStatLbl">Skipped</div></div>
                         <div class="trStat"><div class="trStatNum" id="trFailed">–</div><div class="trStatLbl">Failed</div></div>
                         <div class="trStat"><div class="trStatNum" id="trSavedGb">–</div><div class="trStatLbl">Saved (GB)</div></div>
                     </div>
@@ -79,34 +92,60 @@
                 </div>
 
                 <form class="trConfigForm">
-                    <div class="trCard">
-                        <h3>Safety</h3>
+                    <!-- Dry-run: the master safety switch, kept at the top -->
+                    <div class="trCard trDryCard">
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label>
                                 <input is="emby-checkbox" type="checkbox" id="DryRun" />
-                                <span class="trDry">Dry-run (simulate only, never writes)</span>
+                                <span class="trDry">Dry-run — simulate only, never write</span>
                             </label>
-                            <div class="fieldDescription">Leave this on for the first run. It only logs what it would do.</div>
-                        </div>
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="ReplaceMode">Replace policy</label>
-                            <select is="emby-select" id="ReplaceMode" class="emby-select-withcolor emby-select">
-                                <option value="BackupThenDelete">Backup, then delete (safe)</option>
-                                <option value="SideBySide">Keep side by side</option>
-                                <option value="HardReplace">Hard replace (no backup)</option>
-                            </select>
-                        </div>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="BackupRetentionDays">Backup retention (days)</label>
-                            <input is="emby-input" type="number" id="BackupRetentionDays" min="0" />
-                        </div>
-                        <div class="checkboxContainer">
-                            <label><input is="emby-checkbox" type="checkbox" id="RunOnlyWhenIdle" /><span>Run only when the server is idle</span></label>
+                            <div class="fieldDescription">The master safety switch. While on, the plugin only logs what it would do. Leave it on for the first run; turn it off when you are confident.</div>
                         </div>
                     </div>
 
+                    <!-- Scope: what gets touched -->
                     <div class="trCard">
-                        <h3>Codec &amp; quality</h3>
+                        <h3>Scope</h3>
+                        <div class="trCardSub">Which files the plugin is allowed to consider. Narrow this first.</div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused">Libraries</label>
+                            <div class="trLibs" id="trLibraries"><div class="fieldDescription">Loading libraries…</div></div>
+                            <div class="fieldDescription">Tick the libraries to process. None ticked = all libraries.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="textareaLabel inputLabel inputLabelUnfocused" for="PathIncludeGlobs">Include path globs</label>
+                            <textarea is="emby-textarea" id="PathIncludeGlobs" class="emby-input" rows="3" placeholder="**/Movies/**"></textarea>
+                            <div class="fieldDescription">One glob per line. Empty = include everything. Supports * ? and **.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="textareaLabel inputLabel inputLabelUnfocused" for="PathExcludeGlobs">Exclude path globs</label>
+                            <textarea is="emby-textarea" id="PathExcludeGlobs" class="emby-input" rows="3" placeholder="**/Sample/**"></textarea>
+                            <div class="fieldDescription">One glob per line. Exclude always wins over include.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="MinSourceBitrateKbps">Minimum source bitrate (kbps)</label>
+                            <input is="emby-input" type="number" id="MinSourceBitrateKbps" min="0" />
+                            <div class="fieldDescription">0 processes everything. Higher only touches the big files.</div>
+                        </div>
+
+                        <div class="checkboxContainer">
+                            <label><input is="emby-checkbox" type="checkbox" id="SkipIfAlreadyTargetCodec" /><span>Skip files already in the target codec</span></label>
+                        </div>
+                        <div class="checkboxContainer">
+                            <label><input is="emby-checkbox" type="checkbox" id="SkipDolbyVision" /><span>Skip Dolby Vision (recommended — it can't be preserved)</span></label>
+                        </div>
+                        <div class="checkboxContainer">
+                            <label><input is="emby-checkbox" type="checkbox" id="SkipHdr" /><span>Skip HDR sources</span></label>
+                        </div>
+                    </div>
+
+                    <!-- Output: codec & quality -->
+                    <div class="trCard">
+                        <h3>Output codec &amp; quality</h3>
                         <div class="selectContainer">
                             <label class="selectLabel" for="TargetVideoCodec">Target video codec</label>
                             <select is="emby-select" id="TargetVideoCodec" class="emby-select-withcolor emby-select">
@@ -118,32 +157,35 @@
                         </div>
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="QualityValue">Quality (CRF / CQ)</label>
-                            <input is="emby-input" type="number" id="QualityValue" min="0" max="51" />
-                            <div class="fieldDescription">Lower is better and larger. 23 is a sane HEVC default.</div>
-                        </div>
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="Mode">Quality vs. speed</label>
-                            <select is="emby-select" id="Mode" class="emby-select-withcolor emby-select">
-                                <option value="Quality">Quality (prefer software libx265/AV1)</option>
-                                <option value="Speed">Speed (prefer hardware)</option>
-                            </select>
+                            <input is="emby-input" type="number" id="QualityValue" min="0" max="63" />
+                            <div class="fieldDescription" id="QualityHint">Lower is better and larger.</div>
                         </div>
                     </div>
 
+                    <!-- Encoder & performance -->
                     <div class="trCard">
-                        <h3>Encoder</h3>
+                        <h3>Encoder &amp; performance</h3>
                         <div class="selectContainer">
                             <label class="selectLabel" for="EncoderPreference">Encoder preference</label>
                             <select is="emby-select" id="EncoderPreference" class="emby-select-withcolor emby-select">
-                                <option value="Auto">Auto (probe)</option>
-                                <option value="ForceSoftware">Force software</option>
-                                <option value="ForceHardware">Prefer hardware</option>
+                                <option value="Auto">Auto (probe and pick the best)</option>
+                                <option value="ForceSoftware">Software only</option>
+                                <option value="ForceHardware">Hardware first (fall back to software)</option>
                                 <option value="Specific">Specific encoder</option>
                             </select>
                         </div>
-                        <div class="inputContainer">
+                        <div class="inputContainer" id="SpecificEncoderRow" style="display:none;">
                             <label class="inputLabel inputLabelUnfocused" for="SpecificEncoder">Specific encoder name</label>
                             <input is="emby-input" type="text" id="SpecificEncoder" placeholder="hevc_nvenc" />
+                            <div class="fieldDescription">Use one of the detected encoders shown above. Click a chip to fill this in.</div>
+                        </div>
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="Mode">Encoder bias</label>
+                            <select is="emby-select" id="Mode" class="emby-select-withcolor emby-select">
+                                <option value="Quality">Quality — prefer software (best quality per bit)</option>
+                                <option value="Speed">Speed — prefer hardware (faster, larger)</option>
+                            </select>
+                            <div class="fieldDescription">Only affects which encoder is chosen on Auto, not the CRF value.</div>
                         </div>
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="MaxParallelJobs">Max parallel jobs</label>
@@ -152,15 +194,16 @@
                         </div>
                     </div>
 
+                    <!-- Audio & container -->
                     <div class="trCard">
                         <h3>Audio &amp; container</h3>
                         <div class="selectContainer">
                             <label class="selectLabel" for="AudioMode">Audio</label>
                             <select is="emby-select" id="AudioMode" class="emby-select-withcolor emby-select">
-                                <option value="Copy">Copy</option>
-                                <option value="AddAac">Copy + add AAC</option>
+                                <option value="Copy">Copy (no re-encode)</option>
+                                <option value="AddAac">Copy + add AAC track</option>
                                 <option value="Transcode">Transcode to AAC</option>
-                                <option value="AddOpus">Copy + add Opus</option>
+                                <option value="AddOpus">Copy + add Opus track</option>
                                 <option value="TranscodeOpus">Transcode to Opus</option>
                             </select>
                         </div>
@@ -175,35 +218,48 @@
                         </div>
                     </div>
 
+                    <!-- Verification -->
                     <div class="trCard">
-                        <h3>Filters</h3>
-                        <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="MinSourceBitrateKbps">Minimum source bitrate (kbps)</label>
-                            <input is="emby-input" type="number" id="MinSourceBitrateKbps" min="0" />
-                            <div class="fieldDescription">0 processes everything. Higher only touches the big files.</div>
-                        </div>
-                        <div class="checkboxContainer">
-                            <label><input is="emby-checkbox" type="checkbox" id="SkipIfAlreadyTargetCodec" /><span>Skip files already in the target codec</span></label>
-                        </div>
-                    </div>
-
-                    <div class="trCard">
-                        <h3>HDR &amp; verification</h3>
-                        <div class="checkboxContainer">
-                            <label><input is="emby-checkbox" type="checkbox" id="SkipDolbyVision" /><span>Skip Dolby Vision (recommended)</span></label>
-                        </div>
-                        <div class="checkboxContainer">
-                            <label><input is="emby-checkbox" type="checkbox" id="SkipHdr" /><span>Skip HDR sources</span></label>
-                        </div>
+                        <h3>Verification</h3>
+                        <div class="trCardSub">A re-encode is always checked (codec, duration, audio tracks, size) before it replaces anything. VMAF adds a perceptual-quality gate.</div>
                         <div class="checkboxContainer">
                             <label><input is="emby-checkbox" type="checkbox" id="EnableVmafGate" /><span>Enable VMAF quality gate</span></label>
                         </div>
-                        <div class="inputContainer">
+                        <div class="inputContainer" id="VmafThresholdRow" style="display:none;">
                             <label class="inputLabel inputLabelUnfocused" for="VmafThreshold">VMAF threshold</label>
                             <input is="emby-input" type="number" id="VmafThreshold" min="0" max="100" step="0.5" />
+                            <div class="fieldDescription">95 ≈ visually transparent; below ~90 the loss is visible. An encode that scores below the threshold is rejected and the original is kept.</div>
                         </div>
                     </div>
 
+                    <!-- Replacement & safety: the last, most dangerous decision -->
+                    <div class="trCard">
+                        <h3>Replacement</h3>
+                        <div class="trCardSub">How the original is handled once an encode passes every check.</div>
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="ReplaceMode">Replace policy</label>
+                            <select is="emby-select" id="ReplaceMode" class="emby-select-withcolor emby-select">
+                                <option value="BackupThenDelete">Backup, then delete (safe)</option>
+                                <option value="SideBySide">Keep both (write next to the original)</option>
+                                <option value="HardReplace">Hard replace (overwrite, no backup)</option>
+                            </select>
+                        </div>
+                        <div class="trWarn" id="trHardWarn" style="display:none;">
+                            Hard replace overwrites the original immediately with no backup. A later disk failure or a bad encode is unrecoverable. Strongly consider “Backup, then delete” plus the VMAF gate.
+                        </div>
+                        <div class="inputContainer" id="BackupRetentionRow" style="display:none;">
+                            <label class="inputLabel inputLabelUnfocused" for="BackupRetentionDays">Backup retention (days)</label>
+                            <input is="emby-input" type="number" id="BackupRetentionDays" min="0" />
+                            <div class="fieldDescription">How long the backup is kept after a successful replace. 0 deletes it immediately.</div>
+                        </div>
+                        <div class="checkboxContainer">
+                            <label><input is="emby-checkbox" type="checkbox" id="RunOnlyWhenIdle" /><span>Run only when the server is idle</span></label>
+                        </div>
+                    </div>
+
+                    <div class="trLiveWarn" id="trLiveWarn" style="display:none;">
+                        Dry-run is OFF — saving and running will replace real files.
+                    </div>
                     <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
                 </form>
             </div>
@@ -222,6 +278,7 @@
                     var pluginId = "eff73e61-0320-4bce-bb2c-27fb68604e9d";
                     var page = document.querySelector('#TranscodeReplaceConfigPage');
                     var histTimer = null;
+                    var statusTimer = null;
 
                     function qs(id) { return page.querySelector('#' + id); }
                     function setVal(id, v) {
@@ -231,10 +288,15 @@
                     function getVal(id) {
                         var el = qs(id); if (!el) { return null; }
                         if (el.type === 'checkbox') { return el.checked; }
-                        if (el.type === 'number') { return el.value === '' ? 0 : Number(el.value); }
+                        if (el.type === 'number') {
+                            var n = Number(el.value);
+                            if (el.value === '' || isNaN(n)) { n = el.min !== '' ? Number(el.min) : 0; }
+                            return n;
+                        }
                         return el.value;
                     }
                     function setText(id, v) { var el = qs(id); if (el) { el.textContent = v == null ? '–' : v; } }
+                    function show(id, on) { var el = qs(id); if (el) { el.style.display = on ? '' : 'none'; } }
                     function esc(s) {
                         return String(s == null ? '' : s)
                             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -246,16 +308,68 @@
                         return (n / 1048576).toFixed(0) + ' MB';
                     }
 
+                    // Scalar fields handled by the simple load/save loop.
                     var FIELDS = ['DryRun','TargetVideoCodec','QualityValue','Mode','EncoderPreference','SpecificEncoder',
                         'MaxParallelJobs','AudioMode','PreferredContainer','MinSourceBitrateKbps','SkipIfAlreadyTargetCodec',
                         'ReplaceMode','BackupRetentionDays','EnableVmafGate','VmafThreshold','SkipHdr','SkipDolbyVision','RunOnlyWhenIdle'];
+
+                    // string[] fields handled separately (textarea <-> array).
+                    var ARRAY_FIELDS = ['PathIncludeGlobs','PathExcludeGlobs'];
+                    function setArr(id, arr) { var el = qs(id); if (el) { el.value = (arr || []).join('\n'); } }
+                    function getArr(id) {
+                        var el = qs(id); if (!el) { return []; }
+                        return el.value.split('\n').map(function (s) { return s.trim(); }).filter(function (s) { return s.length; });
+                    }
+
+                    // Per-codec quality guidance (CRF/CQ ranges differ a lot between codecs).
+                    var QUALITY = {
+                        H264: { min: 14, max: 51, def: 21, hint: 'CRF (software) / CQ (hardware). H.264 needs roughly 6 lower than HEVC for the same size.' },
+                        Hevc: { min: 16, max: 51, def: 23, hint: 'CRF (software) / CQ (hardware). 23 is a good HEVC default.' },
+                        Av1:  { min: 20, max: 63, def: 30, hint: 'CRF / CQ. AV1’s scale differs — about 30 is roughly HEVC 23.' },
+                        Vp9:  { min: 20, max: 63, def: 31, hint: 'Constant quality (uses -b:v 0). About 31 is roughly HEVC 23.' }
+                    };
+                    function applyQuality(codec, setDefault) {
+                        var q = QUALITY[codec] || QUALITY.Hevc;
+                        var el = qs('QualityValue');
+                        if (el) { el.min = q.min; el.max = q.max; if (setDefault) { el.value = q.def; } }
+                        setText('QualityHint', q.hint);
+                    }
+
+                    // Show/hide controls that only apply in certain modes.
+                    function syncConditional() {
+                        show('SpecificEncoderRow', qs('EncoderPreference').value === 'Specific');
+                        show('VmafThresholdRow', qs('EnableVmafGate').checked);
+                        show('BackupRetentionRow', qs('ReplaceMode').value === 'BackupThenDelete');
+                        show('trHardWarn', qs('ReplaceMode').value === 'HardReplace');
+                        show('trLiveWarn', !qs('DryRun').checked);
+                    }
+
+                    function loadLibraries(selectedIds) {
+                        var box = qs('trLibraries');
+                        if (!box) { return; }
+                        ApiClient.getVirtualFolders().then(function (folders) {
+                            if (!folders || !folders.length) { box.innerHTML = '<div class="fieldDescription">No libraries found.</div>'; return; }
+                            box.innerHTML = folders.map(function (f) {
+                                var checked = (selectedIds || []).indexOf(f.ItemId) >= 0 ? ' checked' : '';
+                                return '<label class="trLibItem"><input is="emby-checkbox" type="checkbox" class="trLib" value="' +
+                                    esc(f.ItemId) + '"' + checked + ' /><span>' + esc(f.Name) + '</span></label>';
+                            }).join('');
+                        }).catch(function () { box.innerHTML = '<div class="fieldDescription">Could not load libraries.</div>'; });
+                    }
+                    function getLibrarySelection() {
+                        return Array.prototype.map.call(page.querySelectorAll('.trLib:checked'), function (el) { return el.value; });
+                    }
 
                     function loadConfig() {
                         Dashboard.showLoadingMsg();
                         ApiClient.getPluginConfiguration(pluginId).then(function (c) {
                             FIELDS.forEach(function (f) { setVal(f, c[f]); });
+                            ARRAY_FIELDS.forEach(function (f) { setArr(f, c[f]); });
+                            loadLibraries(c.IncludedLibraryIds || []);
+                            applyQuality(c.TargetVideoCodec, false);
+                            syncConditional();
                             Dashboard.hideLoadingMsg();
-                        });
+                        }).catch(function () { Dashboard.hideLoadingMsg(); });
                     }
 
                     function saveConfig(e) {
@@ -263,10 +377,12 @@
                         Dashboard.showLoadingMsg();
                         ApiClient.getPluginConfiguration(pluginId).then(function (c) {
                             FIELDS.forEach(function (f) { c[f] = getVal(f); });
-                            ApiClient.updatePluginConfiguration(pluginId, c).then(function (r) {
+                            ARRAY_FIELDS.forEach(function (f) { c[f] = getArr(f); });
+                            c.IncludedLibraryIds = getLibrarySelection();
+                            return ApiClient.updatePluginConfiguration(pluginId, c).then(function (r) {
                                 Dashboard.processPluginConfigurationUpdateResult(r);
                             });
-                        });
+                        }).catch(function () { Dashboard.hideLoadingMsg(); });
                         return false;
                     }
 
@@ -276,27 +392,31 @@
                                 setText('trQueueLen', s.QueueLength);
                                 setText('trRunning', s.Running);
                                 setText('trDone', s.Done);
+                                setText('trSkipped', s.Skipped);
                                 setText('trFailed', s.Failed);
                                 setText('trSavedGb', (s.SavedBytes / 1073741824).toFixed(2));
 
                                 var act = qs('trActive');
                                 if (act) {
-                                    var dry = s.DryRun ? '<div class="trDryBanner">Dry-run is ON — nothing is written. Turn it off below to actually replace files.</div>' : '';
                                     if (s.Active && s.Active.length) {
                                         act.innerHTML = '<span class="trActiveOn"><span class="trDot"></span>Processing now: ' +
-                                            s.Active.map(esc).join(', ') + '</span>' + dry;
+                                            s.Active.map(esc).join(', ') + '</span>';
                                     } else if (s.QueueLength > 0) {
-                                        act.innerHTML = '<span class="trActiveIdle">Idle — ' + s.QueueLength + ' job(s) queued, waiting to start.</span>' + dry;
+                                        act.innerHTML = '<span class="trActiveIdle">Idle — ' + s.QueueLength + ' job(s) queued, waiting to start.</span>';
                                     } else {
-                                        act.innerHTML = '<span class="trActiveIdle">Idle — nothing in the queue. Run the "Transcode &amp; Replace: Discover media" task to find files.</span>' + dry;
+                                        act.innerHTML = '<span class="trActiveIdle">Idle — nothing queued. Run the "Transcode &amp; Replace: Discover media" task to find files.</span>';
                                     }
                                 }
 
                                 var enc = qs('trEncoders');
                                 if (enc) {
-                                    enc.textContent = (s.UsableEncoders && s.UsableEncoders.length)
-                                        ? 'Detected encoders: ' + s.UsableEncoders.join(', ')
-                                        : 'No usable encoders detected yet (this is probed on first use).';
+                                    if (s.UsableEncoders && s.UsableEncoders.length) {
+                                        enc.innerHTML = 'Detected encoders (click to use one): ' + s.UsableEncoders.map(function (n) {
+                                            return '<span class="trChip" data-enc="' + esc(n) + '">' + esc(n) + '</span>';
+                                        }).join('');
+                                    } else {
+                                        enc.textContent = 'No usable encoders detected yet (this is probed on first use).';
+                                    }
                                 }
                             }).catch(function () {
                                 var enc = qs('trEncoders');
@@ -381,32 +501,37 @@
                         }
                     }
 
-                    var statusTimer = null;
-
-                    function startTimers() {
-                        if (!statusTimer) { statusTimer = setInterval(loadStatus, 4000); }
-                    }
+                    function startTimers() { if (!statusTimer) { statusTimer = setInterval(loadStatus, 4000); } }
                     function stopTimers() {
                         if (histTimer) { clearInterval(histTimer); histTimer = null; }
                         if (statusTimer) { clearInterval(statusTimer); statusTimer = null; }
                     }
-                    function activate() {
-                        loadConfig();
-                        loadStatus();
-                        startTimers();
-                    }
+                    function activate() { loadConfig(); loadStatus(); startTimers(); }
 
+                    // Tab + form wiring.
                     page.querySelectorAll('.trTab').forEach(function (b) {
                         b.addEventListener('click', function () { showTab(b.getAttribute('data-tab')); });
                     });
                     qs('trHistRefresh').addEventListener('click', loadHistory);
                     page.querySelector('.trConfigForm').addEventListener('submit', saveConfig);
 
-                    // The official Jellyfin plugin template loads on 'pageshow', which the
-                    // dashboard dispatches on the config page element; bind that as the primary
-                    // event. Also bind 'viewshow' as a fallback for any view-lifecycle variant,
-                    // and run once immediately so the page populates even if it was shown before
-                    // this inline script attached its listeners.
+                    // Conditional-visibility + dynamic-quality listeners.
+                    qs('EncoderPreference').addEventListener('change', syncConditional);
+                    qs('EnableVmafGate').addEventListener('change', syncConditional);
+                    qs('ReplaceMode').addEventListener('change', syncConditional);
+                    qs('DryRun').addEventListener('change', syncConditional);
+                    qs('TargetVideoCodec').addEventListener('change', function () { applyQuality(this.value, true); });
+
+                    // Click a detected-encoder chip to fill the Specific encoder field.
+                    qs('trEncoders').addEventListener('click', function (ev) {
+                        var t = ev.target;
+                        if (t && t.classList && t.classList.contains('trChip')) {
+                            qs('SpecificEncoder').value = t.getAttribute('data-enc');
+                            qs('EncoderPreference').value = 'Specific';
+                            syncConditional();
+                        }
+                    });
+
                     page.addEventListener('pageshow', activate);
                     page.addEventListener('viewshow', activate);
                     page.addEventListener('pagehide', stopTimers);
