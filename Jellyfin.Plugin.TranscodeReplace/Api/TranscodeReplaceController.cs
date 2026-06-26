@@ -99,7 +99,7 @@ public sealed class JobDto
 [Authorize(Policy = "RequiresElevation")]
 [Route("TranscodeReplace")]
 [Produces("application/json")]
-public class TranscodeReplaceController : ControllerBase
+public sealed class TranscodeReplaceController : ControllerBase
 {
     private readonly IJobQueue _queue;
     private readonly HardwareProbe _probe;

@@ -68,6 +68,12 @@ public sealed class VmafGate
         var threads = Math.Max(1, Environment.ProcessorCount / 2);
         var args = BuildArgs(distortedPath, referencePath, threads);
         var result = await _runner.RunAsync(ffmpegPath, args, cancellationToken).ConfigureAwait(false);
+        if (result.ExitCode != 0)
+        {
+            // libvmaf missing, decode error or resolution mismatch: no trustworthy score.
+            return null;
+        }
+
         return VmafParser.Parse(result.StandardError + "\n" + result.StandardOutput);
     }
 }

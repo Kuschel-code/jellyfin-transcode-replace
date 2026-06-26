@@ -8,6 +8,7 @@ using Jellyfin.Plugin.TranscodeReplace.Worker;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.TranscodeReplace;
 
@@ -30,11 +31,13 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<PlaybackGuard>();
 
         // Persistent queue lives in the plugin data folder so it survives restarts.
-        serviceCollection.AddSingleton<IJobQueue>(_ =>
+        serviceCollection.AddSingleton<IJobQueue>(sp =>
         {
             var dataDir = Plugin.Instance!.DataFolderPath;
             Directory.CreateDirectory(dataDir);
-            return new JsonJobQueue(Path.Combine(dataDir, "jobs.json"));
+            return new JsonJobQueue(
+                Path.Combine(dataDir, "jobs.json"),
+                sp.GetRequiredService<ILogger<JsonJobQueue>>());
         });
 
         serviceCollection.AddHostedService<TranscodeWorker>();

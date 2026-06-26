@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using Jellyfin.Plugin.TranscodeReplace.Hardware;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Jellyfin.Plugin.TranscodeReplace.Replace;
 
@@ -17,12 +19,18 @@ public sealed record PermSnapshot(UnixFileMode Mode, string? Owner);
 public sealed class FilePermissions
 {
     private readonly IProcessRunner _runner;
+    private readonly ILogger<FilePermissions> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FilePermissions"/> class.
     /// </summary>
     /// <param name="runner">Process runner (for stat/chown).</param>
-    public FilePermissions(IProcessRunner runner) => _runner = runner;
+    /// <param name="logger">Logger (optional; a null logger is used when omitted).</param>
+    public FilePermissions(IProcessRunner runner, ILogger<FilePermissions>? logger = null)
+    {
+        _runner = runner;
+        _logger = logger ?? NullLogger<FilePermissions>.Instance;
+    }
 
     /// <summary>Reads the mode and owner of a file. Returns null off Unix or on error.</summary>
     /// <param name="path">File path.</param>
@@ -41,8 +49,9 @@ public sealed class FilePermissions
             var owner = result.ExitCode == 0 ? result.StandardOutput.Trim() : null;
             return new PermSnapshot(mode, string.IsNullOrWhiteSpace(owner) ? null : owner);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Could not read permissions for {Path}; the replaced file will inherit the process umask.", path);
             return null;
         }
     }
@@ -61,9 +70,9 @@ public sealed class FilePermissions
         {
             File.SetUnixFileMode(path, snapshot.Mode);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Best effort.
+            _logger.LogWarning(ex, "Could not restore file mode on {Path}.", path);
         }
 
         if (!string.IsNullOrEmpty(snapshot.Owner))
@@ -72,9 +81,9 @@ public sealed class FilePermissions
             {
                 _runner.Run("chown", new[] { snapshot.Owner, path }, 5000);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Best effort.
+                _logger.LogWarning(ex, "Could not restore owner on {Path}.", path);
             }
         }
     }

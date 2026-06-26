@@ -159,6 +159,15 @@ public sealed class TranscodeWorker : BackgroundService
 
         job.SourceCodec = summary.VideoCodec;
 
+        // Idempotency: if the source is already the target codec, skip. This also makes
+        // a job that was re-queued after a crash mid-replace self-correcting — the
+        // already-transcoded file probes as the target codec and is not re-encoded.
+        if (config.SkipIfAlreadyTargetCodec && CodecNames.Matches(summary.VideoCodec, config.TargetVideoCodec))
+        {
+            Finish(job, JobState.Skipped, $"already in target codec ({summary.VideoCodec})");
+            return;
+        }
+
         var (skip, skipReason) = JobEligibility.Evaluate(summary, config);
         if (skip)
         {
@@ -232,11 +241,19 @@ public sealed class TranscodeWorker : BackgroundService
         {
             var score = await _vmaf.ScoreAsync(ffmpegPath, build.TempOutputPath, job.SourcePath, cancellationToken).ConfigureAwait(false);
             job.Vmaf = score;
+
+            // Fail closed: a quality gate that the user explicitly enabled must not be
+            // skipped just because the score could not be computed (libvmaf missing,
+            // ffmpeg error, resolution mismatch). Keep the original, discard the output.
             if (score is null)
             {
-                _logger.LogWarning("VMAF could not be computed for {Source}; proceeding without the score (is libvmaf available?).", job.SourcePath);
+                TryDelete(build.TempOutputPath);
+                job.Attempts++;
+                Finish(job, JobState.Failed, "VMAF gate is enabled but the score could not be computed (is libvmaf available in jellyfin-ffmpeg?)");
+                return;
             }
-            else if (score < config.VmafThreshold)
+
+            if (score < config.VmafThreshold)
             {
                 TryDelete(build.TempOutputPath);
                 job.Attempts++;
@@ -323,6 +340,15 @@ public sealed class TranscodeWorker : BackgroundService
                 {
                     _logger.LogWarning(
                         "Recovered original from backup after an interrupted replace: {Source}",
+                        job.SourcePath);
+                }
+                else if (!File.Exists(job.SourcePath + AtomicReplacer.BackupExtension))
+                {
+                    // No backup exists: either HardReplace (no crash safety by design) or
+                    // the replace already finished. The idempotency check skips it if it is
+                    // already the target codec; otherwise it is re-encoded.
+                    _logger.LogWarning(
+                        "Interrupted replace for {Source} left no backup; cannot auto-recover (HardReplace policy or already completed).",
                         job.SourcePath);
                 }
             }

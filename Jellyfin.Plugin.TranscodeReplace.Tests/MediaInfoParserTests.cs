@@ -66,4 +66,21 @@ public class MediaInfoParserTests
         Assert.Equal(HdrType.DolbyVision, summary.Hdr);
         Assert.Equal("mp4", summary.Container);
     }
+
+    [Theory]
+    [InlineData("yuv410p", false)]      // 8-bit 4:1:0 — contains "10" but is NOT 10-bit
+    [InlineData("yuv420p", false)]
+    [InlineData("nv12", false)]
+    [InlineData("yuv420p10le", true)]
+    [InlineData("p010le", true)]
+    public void Detects_10bit_From_PixFmt_Without_False_Positives(string pixFmt, bool expected)
+    {
+        var json = $$"""
+        { "streams": [ { "codec_type": "video", "codec_name": "h264", "pix_fmt": "{{pixFmt}}" } ], "format": {} }
+        """;
+
+        var summary = MediaInfoParser.Parse(json, "/media/Clip.mkv");
+
+        Assert.Equal(expected, summary.Is10Bit);
+    }
 }

@@ -1,7 +1,7 @@
 ---
 name: "Transcode & Replace"
 guid: "eff73e61-0320-4bce-bb2c-27fb68604e9d"
-version: "0.0.5.0"
+version: "0.0.6.0"
 targetAbi: "10.11.0.0"
 framework: "net9.0"
 owner: "Kuschel-code"
@@ -15,7 +15,8 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.TranscodeReplace.dll"
 changelog: >
-  0.0.3.0 - Crash-safe replace: the original is backed up by hardlink/copy and the new
-  file is swapped in with one atomic rename, so the source is never empty; an interrupted
-  replace is recovered on startup. 0.0.2.0 - Redesigned settings page and a History view
-  with posters, codec change and size saving. 0.0.1.0 - First release.
+  0.0.6.0 - Review hardening on top of 0.0.5: VMAF gate now fails closed when the score
+  cannot be computed; idempotency skip when the source is already the target codec
+  (self-corrects a crash-requeued job); fixed a 10-bit pixel-format false positive
+  (yuv410p); logging for corrupt queue load and permission failures. 0.0.5.0 - VP9 / Opus
+  / WebM support and config-page fixes. 0.0.3.0 - Crash-safe replace. 0.0.1.0 - First release.

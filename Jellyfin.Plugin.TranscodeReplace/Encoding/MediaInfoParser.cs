@@ -50,7 +50,7 @@ public static class MediaInfoParser
                     var pix = GetString(stream, "pix_fmt");
                     var profile = GetString(stream, "profile");
                     var bitsPerRaw = GetString(stream, "bits_per_raw_sample");
-                    tenBit = (pix?.Contains("10", StringComparison.Ordinal) ?? false)
+                    tenBit = Is10BitPixFmt(pix)
                              || bitsPerRaw == "10"
                              || (profile?.Contains("10", StringComparison.Ordinal) ?? false);
 
@@ -116,6 +116,15 @@ public static class MediaInfoParser
             VideoBitrateKbps = videoBitrateKbps
         };
     }
+
+    // Detects 10-bit from the pixel format without the false positive of a bare "10"
+    // substring (e.g. yuv410p is 8-bit 4:1:0, not 10-bit).
+    private static bool Is10BitPixFmt(string? pixFmt) =>
+        !string.IsNullOrEmpty(pixFmt) &&
+        (pixFmt.Contains("10le", StringComparison.Ordinal)
+            || pixFmt.Contains("10be", StringComparison.Ordinal)
+            || pixFmt.Contains("p010", StringComparison.Ordinal)
+            || pixFmt.Contains("p10", StringComparison.Ordinal));
 
     private static string? GetString(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String

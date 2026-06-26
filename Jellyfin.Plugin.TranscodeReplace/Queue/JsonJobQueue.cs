@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Jellyfin.Plugin.TranscodeReplace.Queue;
 
@@ -23,15 +25,18 @@ public sealed class JsonJobQueue : IJobQueue
     private readonly string _path;
     private readonly object _lock = new();
     private readonly List<TranscodeJob> _jobs;
+    private readonly ILogger<JsonJobQueue> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JsonJobQueue"/> class.
     /// </summary>
     /// <param name="path">Path to the JSON store.</param>
-    public JsonJobQueue(string path)
+    /// <param name="logger">Logger (optional; a null logger is used when omitted).</param>
+    public JsonJobQueue(string path, ILogger<JsonJobQueue>? logger = null)
     {
         _path = path;
-        _jobs = Load(path);
+        _logger = logger ?? NullLogger<JsonJobQueue>.Instance;
+        _jobs = Load();
     }
 
     /// <inheritdoc />
@@ -135,22 +140,24 @@ public sealed class JsonJobQueue : IJobQueue
         }
     }
 
-    private static List<TranscodeJob> Load(string path)
+    private List<TranscodeJob> Load()
     {
         try
         {
-            if (!File.Exists(path))
+            if (!File.Exists(_path))
             {
                 return new List<TranscodeJob>();
             }
 
-            var json = File.ReadAllText(path);
+            var json = File.ReadAllText(_path);
             return JsonSerializer.Deserialize<List<TranscodeJob>>(json, SerializerOptions)
                    ?? new List<TranscodeJob>();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Corrupt store: start fresh rather than crash the plugin.
+            // Corrupt store: start fresh rather than crash the plugin, but make the
+            // loss visible instead of dropping the queue silently.
+            _logger.LogError(ex, "Job queue at {Path} is corrupt or unreadable; starting with an empty queue. Pending jobs are lost.", _path);
             return new List<TranscodeJob>();
         }
     }
