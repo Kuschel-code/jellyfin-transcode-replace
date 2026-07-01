@@ -16,19 +16,37 @@ public static class DiskSpace
     /// <returns>True if there is enough room (or the check is inconclusive).</returns>
     public static bool HasRoomFor(string path, long bytesNeeded)
     {
+        string full;
         try
         {
-            var root = Path.GetPathRoot(Path.GetFullPath(path));
-            if (string.IsNullOrEmpty(root))
-            {
-                return true;
-            }
-
-            return new DriveInfo(root).AvailableFreeSpace >= bytesNeeded;
+            full = Path.GetFullPath(path);
         }
         catch (Exception)
         {
             return true;
         }
+
+        // On Unix Path.GetPathRoot is always "/", which reports the root filesystem
+        // rather than the mount actually holding the media (e.g. /mnt/media). Query
+        // the containing directory first — on Unix DriveInfo stats that path's own
+        // filesystem — and only fall back to the path root (the Windows drive).
+        foreach (var candidate in new[] { Path.GetDirectoryName(full), Path.GetPathRoot(full) })
+        {
+            if (string.IsNullOrEmpty(candidate))
+            {
+                continue;
+            }
+
+            try
+            {
+                return new DriveInfo(candidate).AvailableFreeSpace >= bytesNeeded;
+            }
+            catch (Exception)
+            {
+                // Not a valid drive name on this platform; try the next candidate.
+            }
+        }
+
+        return true;
     }
 }
