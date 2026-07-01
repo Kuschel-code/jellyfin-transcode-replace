@@ -29,6 +29,13 @@ public sealed record VerificationResult(VerifyOutcome Outcome, string? Reason);
 /// </summary>
 public static class Verifier
 {
+    /// <summary>
+    /// Skip reason for a valid output that is not smaller than the source. Referenced
+    /// by the queue: this verdict cost a full encode, so it is the one skip that must
+    /// not be retried for the same file version.
+    /// </summary>
+    public const string NotSmallerReason = "output is not smaller than the source";
+
     private const double MaxDurationDrift = 0.005; // 0.5 %
     private const double MinSizeRatio = 0.02; // < 2 % of source is suspicious
 
@@ -87,7 +94,7 @@ public static class Verifier
 
         if (sourceSize > 0 && outputSize >= sourceSize)
         {
-            return new VerificationResult(VerifyOutcome.SkipNotSmaller, "output is not smaller than the source");
+            return new VerificationResult(VerifyOutcome.SkipNotSmaller, NotSmallerReason);
         }
 
         return new VerificationResult(VerifyOutcome.Passed, null);

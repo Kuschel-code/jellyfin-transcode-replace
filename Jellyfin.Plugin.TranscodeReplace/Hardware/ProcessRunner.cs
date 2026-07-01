@@ -67,6 +67,12 @@ public sealed class ProcessRunner : IProcessRunner
                 throw;
             }
 
+            // WaitForExitAsync does not wait for the redirected output readers to
+            // drain; without this the tail of stdout/stderr (e.g. the VMAF score,
+            // ffmpeg's final error lines) can be lost. The parameterless WaitForExit
+            // flushes the async readers.
+            process.WaitForExit();
+
             return new ProcessResult(process.ExitCode, stdout.ToString(), stderr.ToString());
         }
     }

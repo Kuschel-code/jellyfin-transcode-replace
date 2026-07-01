@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Jellyfin.Plugin.TranscodeReplace.Verify;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -44,14 +45,26 @@ public sealed class JsonJobQueue : IJobQueue
     {
         lock (_lock)
         {
-            var duplicate = _jobs.Any(j =>
+            var existing = _jobs.Where(j =>
                 string.Equals(j.SourcePath, job.SourcePath, StringComparison.OrdinalIgnoreCase) &&
-                j.SourceMtimeIso == job.SourceMtimeIso &&
-                j.State != JobState.Failed);
+                j.SourceMtimeIso == job.SourceMtimeIso).ToList();
 
-            if (duplicate)
+            // A duplicate blocks unless the previous verdict is retryable. Failures and
+            // skips are retryable: skip verdicts depend on the configuration (dry-run,
+            // target codec, HDR policy, encoder availability), so they must be
+            // re-evaluated on the next discovery run — the re-check costs one ffprobe.
+            // The exceptions are active/Done jobs and the not-smaller verdict, which
+            // cost a full encode for this exact file version and must not repeat.
+            if (existing.Any(j => !IsRetryable(j)))
             {
                 return false;
+            }
+
+            // Replace the superseded retryable entries instead of accumulating one
+            // stale row per discovery run.
+            foreach (var stale in existing)
+            {
+                _jobs.Remove(stale);
             }
 
             _jobs.Add(job);
@@ -59,6 +72,11 @@ public sealed class JsonJobQueue : IJobQueue
             return true;
         }
     }
+
+    private static bool IsRetryable(TranscodeJob job) =>
+        job.State == JobState.Failed ||
+        (job.State == JobState.Skipped &&
+         !string.Equals(job.Error, Verifier.NotSmallerReason, StringComparison.OrdinalIgnoreCase));
 
     /// <inheritdoc />
     public TranscodeJob? Dequeue()
