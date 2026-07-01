@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.0.8.0",
+        "changelog": "Fixes three bugs found in a full code review. Critical: after a dry-run pass, turning dry-run off never processed anything because the queue's duplicate check blocked every re-enqueue; skip verdicts are now retryable (except the expensive not-smaller verdict), so config changes and going live work as expected. Also fixes truncated ffmpeg output in the async process runner (could spuriously fail the VMAF gate) and the disk-space check inspecting the root filesystem instead of the media mount on Linux.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/Kuschel-code/jellyfin-transcode-replace/releases/download/v0.0.8/transcode-replace_0.0.8.zip",
+        "checksum": "76c547f5101f3cd0a88f4f3204ee96c4",
+        "timestamp": "2026-07-01T21:51:38Z"
+      },
+      {
         "version": "0.0.7.0",
         "changelog": "Reworked settings page. Cards are reordered into a natural flow with the master dry-run switch on top and the dangerous replace policy at the bottom above Save. Controls that don't apply right now (specific encoder, VMAF threshold, backup retention, the hard-replace warning) are hidden until they're relevant. Quality guidance now adapts to the chosen codec instead of a one-size HEVC hint. The settings that had no UI are now exposed: include/exclude path globs and a library multi-select, plus a Skipped counter and clickable detected-encoder chips. Library scoping is now actually enforced (and fails closed). Also fixes a stuck loading spinner on save errors and an empty-number-field footgun. 77 tests.",
         "targetAbi": "10.11.0.0",
