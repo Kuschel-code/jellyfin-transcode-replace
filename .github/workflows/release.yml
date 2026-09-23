@@ -63,7 +63,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 10.0.x
 
       - name: Bump version in csproj and build.yaml
         run: |
@@ -84,10 +84,10 @@ jobs:
           set -euo pipefail
           VERSION="${{ steps.meta.outputs.version }}"
           V4="${{ steps.meta.outputs.version4 }}"
-          ABI="10.11.0.0"
+          ABI="12.0.0.0"
           GUID="eff73e61-0320-4bce-bb2c-27fb68604e9d"
           TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          DLL="Jellyfin.Plugin.TranscodeReplace/bin/Release/net9.0/Jellyfin.Plugin.TranscodeReplace.dll"
+          DLL="Jellyfin.Plugin.TranscodeReplace/bin/Release/net10.0/Jellyfin.Plugin.TranscodeReplace.dll"
           CHANGELOG="$(cat "${{ steps.meta.outputs.changelog_file }}")"
 
           mkdir -p package
@@ -100,7 +100,7 @@ jobs:
             '{category:"General", guid:$guid, name:"Transcode & Replace",
               description:"Batch-transcode library media to HEVC/AV1/VP9 and atomically replace the original.",
               overview:"Transcode library media and replace the originals, with verification gates.",
-              owner:"Kuschel-code", targetAbi:$abi, framework:"net9.0",
+              owner:"Kuschel-code", targetAbi:$abi, framework:"net10.0",
               version:$v, changelog:$cl, timestamp:$ts}' > package/meta.json
 
           cd package

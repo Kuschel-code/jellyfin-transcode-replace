@@ -1,2 +1,2 @@
-0.0.8
-Fixes three bugs found in a full code review. Critical: after a dry-run pass, turning dry-run off never processed anything because the queue's duplicate check blocked every re-enqueue; skip verdicts are now retryable (except the expensive not-smaller verdict), so config changes and going live work as expected. Also fixes truncated ffmpeg output in the async process runner (could spuriously fail the VMAF gate) and the disk-space check inspecting the root filesystem instead of the media mount on Linux.
+0.1.0
+Jellyfin 12. Requires Jellyfin 12.0 or newer. Built for .NET 10 against Jellyfin.Controller 12.0.0 with targetAbi 12.0.0.0, so it loads on 12.0 and 12.1; Jellyfin 10.11 servers keep offering the previous release.

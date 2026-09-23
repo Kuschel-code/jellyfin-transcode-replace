@@ -36,7 +36,14 @@ If you are not sure, leave dry-run on, look at the log, and only then switch it 
 
 ## Requirements
 
-- Jellyfin 10.11 (the plugin targets ABI 10.11.0.0 and .NET 9).
+- Jellyfin 12.0 or newer (the plugin targets ABI 12.0.0.0 and .NET 10). The catalog only
+  offers the build that fits your server:
+
+  | Jellyfin server | Transcode & Replace | .NET |
+  |---|---|---|
+  | **12.0, 12.1+** | **0.1.x** | 10 |
+  | 10.11.x | 0.0.8 (last 10.11 build) | 9 |
+
 - The bundled jellyfin-ffmpeg. The plugin uses its ffmpeg/ffprobe, so you don't
   configure a path.
 
@@ -81,7 +88,7 @@ Dashboard, then Plugins, then Transcode & Replace.
 
 ## Build
 
-Needs the .NET 9 SDK.
+Needs the .NET 10 SDK.
 
 ```
 dotnet build -c Release
@@ -89,7 +96,7 @@ dotnet test  -c Release
 ```
 
 The DLL ends up in
-`Jellyfin.Plugin.TranscodeReplace/bin/Release/net9.0/Jellyfin.Plugin.TranscodeReplace.dll`.
+`Jellyfin.Plugin.TranscodeReplace/bin/Release/net10.0/Jellyfin.Plugin.TranscodeReplace.dll`.
 
 ## Install
 
@@ -117,10 +124,10 @@ Either way, configure it and leave dry-run on for the first run.
 Everything described above is implemented: hardware probe, persistent queue and
 discovery, the ffmpeg argument builder, ffprobe verification, the VMAF gate, HDR and
 Dolby Vision handling, the playback/idle/disk guards, atomic replace with backup and
-permission preservation, and a status endpoint for the config page. There are 53 unit
+permission preservation, and a status endpoint for the config page. There are 82 unit
 tests covering the argument builder, the parsers, the verifier and the queue.
 
-This is a 0.0.1 release. It works, but it is replacing your files, so test it on a
+This is still an early 0.x plugin. It works, but it is replacing your files, so test it on a
 small library first.
 
 ## License
