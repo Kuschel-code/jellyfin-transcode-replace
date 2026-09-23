@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.1.0.0",
+        "changelog": "Jellyfin 12. Requires Jellyfin 12.0 or newer. Built for .NET 10 against Jellyfin.Controller 12.0.0 with targetAbi 12.0.0.0, so it loads on 12.0 and 12.1; Jellyfin 10.11 servers keep offering the previous release.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/Kuschel-code/jellyfin-transcode-replace/releases/download/v0.1.0/transcode-replace_0.1.0.zip",
+        "checksum": "9378c426fc827a9b439ef320fcf68b8e",
+        "timestamp": "2026-09-23T03:20:30Z"
+      },
+      {
         "version": "0.0.8.0",
         "changelog": "Fixes three bugs found in a full code review. Critical: after a dry-run pass, turning dry-run off never processed anything because the queue's duplicate check blocked every re-enqueue; skip verdicts are now retryable (except the expensive not-smaller verdict), so config changes and going live work as expected. Also fixes truncated ffmpeg output in the async process runner (could spuriously fail the VMAF gate) and the disk-space check inspecting the root filesystem instead of the media mount on Linux.",
         "targetAbi": "10.11.0.0",
